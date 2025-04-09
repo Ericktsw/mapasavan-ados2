@@ -1,0 +1,3330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animador de Mapas - Avançado</title>
+    
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.3.0/ol.css">
+    
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+        }
+        
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        #map {
+            flex: 1;
+        }
+        
+        #controls {
+            background: #f5f5f5;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+        
+        #timeline {
+            height: 30px;
+            background: #eee;
+            position: relative;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        
+        #playhead {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background: red;
+            top: 0;
+            left: 0;
+        }
+        
+        button {
+            padding: 5px 10px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            cursor: pointer;
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        /* Painel de propriedades */
+        .property-editor {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .property-editor.active {
+            display: block !important;
+        }
+
+        .property-row {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .property-row label {
+            width: 150px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .property-row input, .property-row textarea, .property-row select {
+            width: 100px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        
+        .property-row textarea {
+            width: 200px;
+            height: 60px;
+        }
+
+        /* Estilo para os keyframes na timeline */
+        .keyframe-marker {
+            position: absolute;
+            width: 10px;
+            height: 20px;
+            background: orange;
+            top: 5px;
+            transform: translateX(-5px);
+            cursor: pointer;
+        }
+
+        /* Status de desenho */
+        .drawing-active {
+            background-color: #4CAF50 !important;
+            color: white;
+        }
+        
+        /* Item selecionado */
+        .feature-selected {
+            stroke-width: 5px;
+            stroke-dasharray: 5, 5;
+        }
+        
+        h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .update-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .update-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .status-message {
+            margin-top: 10px;
+            padding: 5px;
+            color: #333;
+            font-style: italic;
+        }
+        
+        /* Estilo para a pesquisa de países */
+        #country-search-container {
+            display: flex;
+            flex-direction: column;
+            background: white;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        
+        #country-search-input {
+            padding: 8px;
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        #country-results {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #fafafa;
+            border: 1px solid #eee;
+        }
+        
+        .country-item {
+            padding: 6px 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .country-item:hover {
+            background: #f0f0f0;
+        }
+        
+        /* Abas para organizar controles */
+        .tab-container {
+            margin-bottom: 15px;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            border-bottom: 1px solid #ccc;
+        }
+        
+        .tab-btn {
+            padding: 8px 12px;
+            background: #f1f1f1;
+            border: 1px solid #ccc;
+            border-bottom: none;
+            cursor: pointer;
+            margin-right: 2px;
+            border-radius: 4px 4px 0 0;
+        }
+        
+        .tab-btn.active {
+            background: white;
+            position: relative;
+        }
+        
+        .tab-btn.active:after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: white;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-top: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Lista de objetos */
+        #objects-list {
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .object-item {
+            padding: 8px 10px;
+            background: white;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .object-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .object-item.selected {
+            background: #e3f2fd;
+        }
+        
+        .object-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .object-actions button {
+            padding: 2px 5px;
+            margin: 0;
+            font-size: 12px;
+        }
+        
+        /* Estilos para exportação de vídeo */
+        .export-container {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .export-options {
+            margin-bottom: 15px;
+        }
+        
+        .progress-container {
+            display: none;
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* Configurações de easing */
+        .easing-settings {
+            margin-top: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        /* Frames Container para FFmpeg */
+        #frames-container {
+            display: none;
+        }
+        
+        /* Container para a renderização de exportação */
+        #export-container {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 1920px;
+            height: 1080px;
+            background-color: white;
+            overflow: hidden;
+        }
+        
+        /* Estilo para o importador de GeoJSON/KML/KMZ */
+        .import-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .file-input-container {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+        
+        .file-input-container input[type="file"] {
+            margin-bottom: 10px;
+        }
+        
+        .import-preview {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .import-options {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        /* Configurações de exportação */
+        .export-settings {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border: 1px solid #cce0ff;
+            border-radius: 4px;
+        }
+
+        /* Separador de importação */
+        .import-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="map"></div>
+        <div id="controls">
+            <!-- Abas para organizar a interface -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <div class="tab-btn active" data-tab="draw">Desenhar</div>
+                    <div class="tab-btn" data-tab="countries">Países</div>
+                    <div class="tab-btn" data-tab="import">Importar</div>
+                    <div class="tab-btn" data-tab="objects">Objetos</div>
+                    <div class="tab-btn" data-tab="export">Exportar</div>
+                    <div class="tab-btn" data-tab="settings">Configurações</div>
+                </div>
+                
+                <!-- Aba de Desenho -->
+                <div class="tab-content active" id="tab-draw">
+                    <!-- Botões principais -->
+                    <div class="control-group">
+                        <button id="draw-line">Desenhar Linha</button>
+                        <button id="draw-polygon">Desenhar Polígono</button>
+                        <button id="add-text">Adicionar Texto</button>
+                        <button id="finish-drawing" disabled>Finalizar Desenho</button>
+                        <button id="add-keyframe">Adicionar Keyframe</button>
+                        <button id="play">Iniciar</button>
+                        <button id="stop">Parar</button>
+                    </div>
+                    
+                    <!-- Configurações de Easing (suavização) -->
+                    <div class="easing-settings">
+                        <h3>Suavização de Keyframes</h3>
+                        <div class="property-row">
+                            <label for="easing-type">Tipo de Transição:</label>
+                            <select id="easing-type">
+                                <option value="linear">Linear</option>
+                                <option value="easeInOut" selected>Ease In Out</option>
+                                <option value="easeIn">Ease In</option>
+                                <option value="easeOut">Ease Out</option>
+                                <option value="bounce">Bounce</option>
+                                <option value="elastic">Elastic</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <span id="status-message" class="status-message"></span>
+                </div>
+                
+                <!-- Aba de Países -->
+                <div class="tab-content" id="tab-countries">
+                    <div id="country-search-container">
+                        <h3>Buscar País</h3>
+                        <input type="text" id="country-search-input" placeholder="Digite o nome do país...">
+                        <div id="country-results"></div>
+                    </div>
+                </div>
+                
+                <!-- Aba de Importação -->
+                <div class="tab-content" id="tab-import">
+                    <!-- Seção de importação GeoJSON -->
+                    <div class="import-section import-container">
+                        <h3>Importar GeoJSON</h3>
+                        <div class="file-input-container">
+                            <input type="file" id="geojson-file" accept=".geojson,.json">
+                            <button id="import-geojson-btn" class="update-btn">Importar GeoJSON</button>
+                        </div>
+                        <div class="import-options">
+                            <div class="property-row">
+                                <label for="geojson-color">Cor de Preenchimento:</label>
+                                <input type="color" id="geojson-color" value="#3388ff">
+                            </div>
+                            <div class="property-row">
+                                <label for="geojson-opacity">Opacidade:</label>
+                                <input type="range" id="geojson-opacity" min="0" max="1" step="0.1" value="0.5">
+                            </div>
+                            <div class="property-row">
+                                <label for="geojson-stroke-color">Cor da Borda:</label>
+                                <input type="color" id="geojson-stroke-color" value="#0066cc">
+                            </div>
+                            <div class="property-row">
+                                <label for="geojson-stroke-width">Espessura da Borda:</label>
+                                <input type="number" id="geojson-stroke-width" min="1" max="10" value="2">
+                            </div>
+                        </div>
+                        <div id="geojson-preview" class="import-preview"></div>
+                    </div>
+                    
+                    <!-- Seção de importação KML/KMZ -->
+                    <div class="import-section import-container">
+                        <h3>Importar KML/KMZ</h3>
+                        <div class="file-input-container">
+                            <input type="file" id="kml-file" accept=".kml,.kmz">
+                            <button id="import-kml-btn" class="update-btn">Importar KML/KMZ</button>
+                        </div>
+                        <div class="import-options">
+                            <div class="property-row">
+                                <label for="kml-color">Cor de Preenchimento:</label>
+                                <input type="color" id="kml-color" value="#3388ff">
+                            </div>
+                            <div class="property-row">
+                                <label for="kml-opacity">Opacidade:</label>
+                                <input type="range" id="kml-opacity" min="0" max="1" step="0.1" value="0.5">
+                            </div>
+                            <div class="property-row">
+                                <label for="kml-stroke-color">Cor da Borda:</label>
+                                <input type="color" id="kml-stroke-color" value="#0066cc">
+                            </div>
+                            <div class="property-row">
+                                <label for="kml-stroke-width">Espessura da Borda:</label>
+                                <input type="number" id="kml-stroke-width" min="1" max="10" value="2">
+                            </div>
+                        </div>
+                        <div id="kml-preview" class="import-preview"></div>
+                    </div>
+                </div>
+                
+                <!-- Aba de Objetos -->
+                <div class="tab-content" id="tab-objects">
+                    <h3>Lista de Objetos</h3>
+                    <div id="objects-list"></div>
+                </div>
+                
+                <!-- Aba de Exportação -->
+                <div class="tab-content" id="tab-export">
+                    <div class="export-container">
+                        <h3>Exportar Animação</h3>
+                        <div class="export-options">
+                            <div class="property-row">
+                                <label for="video-quality">Qualidade:</label>
+                                <select id="video-quality">
+                                    <option value="low">Baixa (720p)</option>
+                                    <option value="medium" selected>Média (1080p)</option>
+                                    <option value="high">Alta (1440p)</option>
+                                </select>
+                            </div>
+                            <div class="property-row">
+                                <label for="video-fps">FPS:</label>
+                                <select id="video-fps">
+                                    <option value="24">24 FPS</option>
+                                    <option value="30" selected>30 FPS</option>
+                                    <option value="60">60 FPS</option>
+                                </select>
+                            </div>
+                            <div class="property-row">
+                                <label for="video-format">Formato:</label>
+                                <select id="video-format">
+                                    <option value="webm" selected>WebM</option>
+                                    <option value="gif">GIF</option>
+                                    <option value="frames">Frames (ZIP)</option>
+                                </select>
+                            </div>
+                            <div class="property-row">
+                                <label for="video-duration">Duração (s):</label>
+                                <input type="number" id="video-duration" min="5" max="60" step="1" value="15">
+                            </div>
+                        </div>
+                        
+                        <div class="export-settings">
+                            <h3>Configurações Avançadas</h3>
+                            <div class="property-row">
+                                <label for="tile-load-timeout">Tempo de Carregamento (ms):</label>
+                                <input type="number" id="tile-load-timeout" min="1000" max="20000" step="500" value="5000">
+                            </div>
+                            <div class="property-row">
+                                <label for="frame-delay">Atraso entre Frames (ms):</label>
+                                <input type="number" id="frame-delay" min="100" max="2000" step="100" value="500">
+                            </div>
+                        </div>
+                        
+                        <button id="export-btn" class="update-btn">Exportar Vídeo</button>
+                        <div class="progress-container" id="export-progress-container">
+                            <div class="progress-bar" id="export-progress-bar">0%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Conteúdo da aba de Configurações -->
+                <div class="tab-content" id="tab-settings">
+                    <h3>Configurações de Mapa</h3>
+                    <div class="control-group">
+                        <label for="map-api-key">Chave de API:</label>
+                        <input type="text" id="map-api-key" placeholder="Insira sua chave de API">
+                    </div>
+                    <div class="control-group">
+                        <label for="map-service-url">URL do Serviço de Mapas:</label>
+                        <input type="text" id="map-service-url" placeholder="Insira a URL do serviço de mapas">
+                    </div>
+                    <button id="save-map-settings" class="update-btn">Salvar Configurações</button>
+                    <span id="map-settings-status" class="status-message"></span>
+                </div>
+            </div>
+            
+            <!-- Editor de propriedades para linha -->
+            <div id="line-properties" class="property-editor">
+                <h3>Propriedades da Linha</h3>
+                <div class="property-row">
+                    <label for="line-color">Cor:</label>
+                    <input type="color" id="line-color" value="#3388ff">
+                </div>
+                <div class="property-row">
+                    <label for="line-width">Espessura:</label>
+                    <input type="number" id="line-width" min="1" max="10" value="3">
+                </div>
+                <div class="property-row">
+                    <label for="line-animation-start">Início Animação (s):</label>
+                    <input type="number" id="line-animation-start" min="0" max="15" step="0.1" value="0">
+                </div>
+                <div class="property-row">
+                    <label for="line-animation-end">Fim Animação (s):</label>
+                    <input type="number" id="line-animation-end" min="0" max="15" step="0.1" value="5">
+                </div>
+                <div class="property-row">
+                    <label for="line-fade-out-end">Desaparecer em (s):</label>
+                    <input type="number" id="line-fade-out-end" min="0" max="15" step="0.1" value="15">
+                </div>
+                <button id="update-line" class="update-btn">Atualizar Linha</button>
+            </div>
+            
+            <!-- Editor de propriedades para polígono -->
+            <div id="polygon-properties" class="property-editor">
+                <h3>Propriedades do Polígono</h3>
+                <div class="property-row">
+                    <label for="polygon-fill-color">Cor de Preenchimento:</label>
+                    <input type="color" id="polygon-fill-color" value="#3388ff">
+                </div>
+                <div class="property-row">
+                    <label for="polygon-opacity">Opacidade:</label>
+                    <input type="range" id="polygon-opacity" min="0" max="1" step="0.1" value="0.5">
+                </div>
+                <div class="property-row">
+                    <label for="polygon-stroke-color">Cor da Borda:</label>
+                    <input type="color" id="polygon-stroke-color" value="#0066cc">
+                </div>
+                <div class="property-row">
+                    <label for="polygon-stroke-width">Espessura da Borda:</label>
+                    <input type="number" id="polygon-stroke-width" min="1" max="10" value="2">
+                </div>
+                <div class="property-row">
+                    <label for="polygon-animation-start">Início Animação (s):</label>
+                    <input type="number" id="polygon-animation-start" min="0" max="15" step="0.1" value="0">
+                </div>
+                <div class="property-row">
+                    <label for="polygon-animation-end">Fim Animação (s):</label>
+                    <input type="number" id="polygon-animation-end" min="0" max="15" step="0.1" value="5">
+                </div>
+                <div class="property-row">
+                    <label for="polygon-fade-out-end">Desaparecer em (s):</label>
+                    <input type="number" id="polygon-fade-out-end" min="0" max="15" step="0.1" value="15">
+                </div>
+                <button id="update-polygon" class="update-btn">Atualizar Polígono</button>
+            </div>
+            
+            <!-- Editor de propriedades para texto -->
+            <div id="text-properties" class="property-editor">
+                <h3>Propriedades do Texto</h3>
+                <div class="property-row">
+                    <label for="text-content">Conteúdo:</label>
+                    <textarea id="text-content" placeholder="Digite o texto...">Novo Texto</textarea>
+                </div>
+                <div class="property-row">
+                    <label for="text-color">Cor:</label>
+                    <input type="color" id="text-color" value="#000000">
+                </div>
+                <div class="property-row">
+                    <label for="text-size">Tamanho:</label>
+                    <input type="number" id="text-size" min="8" max="48" value="14">
+                </div>
+                <div class="property-row">
+                    <label for="text-font">Fonte:</label>
+                    <select id="text-font">
+                        <option value="Arial">Arial</option>
+                        <option value="Verdana">Verdana</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Georgia">Georgia</option>
+                    </select>
+                </div>
+                <div class="property-row">
+                    <label for="text-bold">Negrito:</label>
+                    <input type="checkbox" id="text-bold">
+                </div>
+                <div class="property-row">
+                    <label for="text-animation-start">Início Animação (s):</label>
+                    <input type="number" id="text-animation-start" min="0" max="15" step="0.1" value="0">
+                </div>
+                <div class="property-row">
+                    <label for="text-animation-end">Fim Animação (s):</label>
+                    <input type="number" id="text-animation-end" min="0" max="15" step="0.1" value="5">
+                </div>
+                <div class="property-row">
+                    <label for="text-fade-out-end">Desaparecer em (s):</label>
+                    <input type="number" id="text-fade-out-end" min="0" max="15" step="0.1" value="15">
+                </div>
+                <button id="update-text" class="update-btn">Atualizar Texto</button>
+            </div>
+            
+            <!-- Timeline -->
+            <div class="timeline-container">
+                <div id="timeline">
+                    <div id="playhead"></div>
+                    <div id="keyframes-container"></div>
+                </div>
+                <div class="timeline-info">
+                    <span>0s</span>
+                    <span style="float:right">15s</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Container para exportação -->
+    <div id="export-container"></div>
+    
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@7.3.0/dist/ol.js"></script>
+    
+    <!-- JSZip para exportação de frames como ZIP e KMZ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- FileSaver para download do ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- HTML2Canvas para exportação de vídeo -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Verificar se JSZip está disponível
+            console.log("JSZip disponível:", typeof JSZip !== 'undefined');
+            
+            // Inicializando variáveis
+            let currentTime = 0;
+            let duration = 15; // 15 segundos por padrão, mas pode ser alterado pelo usuário
+            let isPlaying = false;
+            let animationFrame;
+            const keyframes = [];
+            const features = [];
+            let selectedFeature = null;
+            let showSelectionStyle = true; // Controla se a seleção visual será mostrada
+            let isDrawing = false;
+            let drawInteraction = null;
+            let currentDrawType = null;
+            let addingText = false;
+            let nextFeatureId = 1;
+            let countriesGeoJSON = null;
+            let isCountriesLoading = false;
+            let isExporting = false;
+            
+            // Elementos DOM
+            const timelineEl = document.getElementById('timeline');
+            const playheadEl = document.getElementById('playhead');
+            const keyframesContainer = document.getElementById('keyframes-container');
+            const playBtn = document.getElementById('play');
+            const stopBtn = document.getElementById('stop');
+            const drawLineBtn = document.getElementById('draw-line');
+            const drawPolygonBtn = document.getElementById('draw-polygon');
+            const addTextBtn = document.getElementById('add-text');
+            const finishDrawingBtn = document.getElementById('finish-drawing');
+            const addKeyframeBtn = document.getElementById('add-keyframe');
+            const linePropertiesEl = document.getElementById('line-properties');
+            const polygonPropertiesEl = document.getElementById('polygon-properties');
+            const textPropertiesEl = document.getElementById('text-properties');
+            const statusMessageEl = document.getElementById('status-message');
+            const countrySearchInput = document.getElementById('country-search-input');
+            const countryResults = document.getElementById('country-results');
+            const objectsList = document.getElementById('objects-list');
+            const easingTypeSelect = document.getElementById('easing-type');
+            const exportBtn = document.getElementById('export-btn');
+            const videoQualitySelect = document.getElementById('video-quality');
+            const videoFpsSelect = document.getElementById('video-fps');
+            const videoFormatSelect = document.getElementById('video-format');
+            const videoDurationInput = document.getElementById('video-duration');
+            const exportProgressContainer = document.getElementById('export-progress-container');
+            const exportProgressBar = document.getElementById('export-progress-bar');
+            const exportContainer = document.getElementById('export-container');
+            
+            // Novos elementos para configurações de exportação
+            const tileLoadTimeoutInput = document.getElementById('tile-load-timeout');
+            const frameDelayInput = document.getElementById('frame-delay');
+            
+            // Elementos de importação GeoJSON
+            const geojsonFileInput = document.getElementById('geojson-file');
+            const importGeojsonBtn = document.getElementById('import-geojson-btn');
+            const geojsonPreview = document.getElementById('geojson-preview');
+            const geojsonColorInput = document.getElementById('geojson-color');
+            const geojsonOpacityInput = document.getElementById('geojson-opacity');
+            const geojsonStrokeColorInput = document.getElementById('geojson-stroke-color');
+            const geojsonStrokeWidthInput = document.getElementById('geojson-stroke-width');
+            
+            // Elementos de importação KML/KMZ
+            const kmlFileInput = document.getElementById('kml-file');
+            const importKmlBtn = document.getElementById('import-kml-btn');
+            const kmlPreview = document.getElementById('kml-preview');
+            const kmlColorInput = document.getElementById('kml-color');
+            const kmlOpacityInput = document.getElementById('kml-opacity');
+            const kmlStrokeColorInput = document.getElementById('kml-stroke-color');
+            const kmlStrokeWidthInput = document.getElementById('kml-stroke-width');
+            
+            // Propriedades linha
+            const lineColorInput = document.getElementById('line-color');
+            const lineWidthInput = document.getElementById('line-width');
+            const lineAnimationStartInput = document.getElementById('line-animation-start');
+            const lineAnimationEndInput = document.getElementById('line-animation-end');
+            const lineFadeOutEndInput = document.getElementById('line-fade-out-end');
+            const updateLineBtn = document.getElementById('update-line');
+            
+            // Propriedades polígono
+            const polygonFillColorInput = document.getElementById('polygon-fill-color');
+            const polygonOpacityInput = document.getElementById('polygon-opacity');
+            const polygonStrokeColorInput = document.getElementById('polygon-stroke-color');
+            const polygonStrokeWidthInput = document.getElementById('polygon-stroke-width');
+            const polygonAnimationStartInput = document.getElementById('polygon-animation-start');
+            const polygonAnimationEndInput = document.getElementById('polygon-animation-end');
+            const polygonFadeOutEndInput = document.getElementById('polygon-fade-out-end');
+            const updatePolygonBtn = document.getElementById('update-polygon');
+            
+            // Propriedades texto
+            const textContentInput = document.getElementById('text-content');
+            const textColorInput = document.getElementById('text-color');
+            const textSizeInput = document.getElementById('text-size');
+            const textFontInput = document.getElementById('text-font');
+            const textBoldInput = document.getElementById('text-bold');
+            const textAnimationStartInput = document.getElementById('text-animation-start');
+            const textAnimationEndInput = document.getElementById('text-animation-end');
+            const textFadeOutEndInput = document.getElementById('text-fade-out-end');
+            const updateTextBtn = document.getElementById('update-text');
+            
+            // Configurações de mapa
+            const mapApiKeyInput = document.getElementById('map-api-key');
+            const mapServiceUrlInput = document.getElementById('map-service-url');
+            const saveMapSettingsBtn = document.getElementById('save-map-settings');
+            const mapSettingsStatus = document.getElementById('map-settings-status');
+            
+            // Controle de abas
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Desativar todas as abas
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    
+                    // Ativar a aba clicada
+                    this.classList.add('active');
+                    document.getElementById('tab-' + tabId).classList.add('active');
+                });
+            });
+            
+            // Atualizar duração quando o usuário mudar o valor
+            videoDurationInput.addEventListener('change', function() {
+                const newDuration = parseInt(this.value);
+                if (newDuration >= 5 && newDuration <= 60) {
+                    duration = newDuration;
+                    
+                    // Atualizar a interface da timeline
+                    document.querySelector('.timeline-info span:last-child').textContent = duration + 's';
+                    
+                    // Atualizar duração máxima nos inputs relacionados à animação
+                    const durationInputs = [
+                        lineAnimationStartInput, lineAnimationEndInput, lineFadeOutEndInput,
+                        polygonAnimationStartInput, polygonAnimationEndInput, polygonFadeOutEndInput,
+                        textAnimationStartInput, textAnimationEndInput, textFadeOutEndInput
+                    ];
+                    
+                    durationInputs.forEach(input => {
+                        input.max = duration;
+                        
+                        // Se o valor atual for maior que a nova duração, ajustá-lo
+                        if (parseFloat(input.value) > duration) {
+                            input.value = duration;
+                        }
+                    });
+                    
+                    // Ajustar os valores de fadeOut das features existentes
+                    features.forEach(feature => {
+                        const fadeOutEnd = feature.get('fadeOutEnd');
+                        if (fadeOutEnd > duration) {
+                            feature.set('fadeOutEnd', duration);
+                        }
+                    });
+                    
+                    // Se o tempo atual for maior que a nova duração, ajustá-lo
+                    if (currentTime > duration) {
+                        setCurrentTime(duration);
+                    }
+                    
+                    statusMessageEl.textContent = `Duração da animação alterada para ${duration} segundos.`;
+                }
+            });
+            
+            // Inicializa o mapa com OSM como primeira camada
+            const osmLayer = new ol.layer.Tile({
+                source: new ol.source.OSM()
+            });
+            
+            // Inicializa o mapa
+            const map = new ol.Map({
+                target: 'map',
+                layers: [
+                    osmLayer
+                ],
+                view: new ol.View({
+                    center: ol.proj.fromLonLat([0, 0]),
+                    zoom: 2
+                })
+            });
+            
+            // Variável para armazenar a camada de mapa atual
+            let currentMapLayer = osmLayer;
+            let mapSourceType = 'osm'; // Tipo de fonte do mapa: 'osm', 'xyz', etc.
+            let mapSourceConfig = {}; // Configurações de origem do mapa
+            
+            // Função para carregar o mapa com base nas configurações
+            function loadMapLayer(apiKey, serviceUrl) {
+                // Determinar o tipo de origem do mapa
+                let newSource;
+                let newLayer;
+                
+                // Guardar a configuração para uso na exportação
+                mapSourceConfig = {
+                    apiKey: apiKey,
+                    serviceUrl: serviceUrl
+                };
+                
+                // Verificar o tipo de serviço
+                if (serviceUrl.includes('google')) {
+                    // Google Maps
+                    mapSourceType = 'xyz';
+                    newSource = new ol.source.XYZ({
+                        url: `${serviceUrl}?key=${apiKey}`,
+                        attributions: '© Google Maps',
+                        crossOrigin: 'anonymous' // Importante para html2canvas
+                    });
+                } else if (serviceUrl.includes('mapbox')) {
+                    // Mapbox
+                    mapSourceType = 'xyz';
+                    newSource = new ol.source.XYZ({
+                        url: `${serviceUrl}?access_token=${apiKey}`,
+                        attributions: '© Mapbox',
+                        crossOrigin: 'anonymous'
+                    });
+                } else if (serviceUrl.includes('arcgis') || serviceUrl.includes('esri')) {
+                    // ESRI/ArcGIS
+                    mapSourceType = 'xyz';
+                    newSource = new ol.source.XYZ({
+                        url: serviceUrl,
+                        attributions: '© Esri',
+                        crossOrigin: 'anonymous'
+                    });
+                } else {
+                    // Serviço de mapas genérico XYZ
+                    mapSourceType = 'xyz';
+                    newSource = new ol.source.XYZ({
+                        url: serviceUrl,
+                        attributions: '© Map Service',
+                        crossOrigin: 'anonymous'
+                    });
+                }
+                
+                // Criar nova camada
+                newLayer = new ol.layer.Tile({
+                    source: newSource,
+                    preload: 4 // Pré-carregar tiles para melhor desempenho
+                });
+                
+                // Remover a camada atual do mapa
+                map.removeLayer(currentMapLayer);
+                
+                // Adicionar a nova camada
+                map.getLayers().insertAt(0, newLayer);
+                
+                // Atualizar a camada atual
+                currentMapLayer = newLayer;
+                
+                return newLayer;
+            }
+            
+            // Salvar configurações e carregar o mapa
+            saveMapSettingsBtn.addEventListener('click', function() {
+                const apiKey = mapApiKeyInput.value.trim();
+                const serviceUrl = mapServiceUrlInput.value.trim();
+
+                if (!serviceUrl) {
+                    mapSettingsStatus.textContent = "Por favor, insira pelo menos a URL do serviço de mapas.";
+                    return;
+                }
+
+                try {
+                    // Carregar o mapa com as novas configurações
+                    loadMapLayer(apiKey, serviceUrl);
+
+                    // Salvar as configurações no localStorage
+                    localStorage.setItem('mapApiKey', apiKey);
+                    localStorage.setItem('mapServiceUrl', serviceUrl);
+                    localStorage.setItem('mapSourceType', mapSourceType);
+                    localStorage.setItem('mapSourceConfig', JSON.stringify(mapSourceConfig));
+
+                    // Feedback para o usuário
+                    mapSettingsStatus.textContent = "Configurações salvas e mapa carregado com sucesso!";
+                } catch (error) {
+                    console.error("Erro ao carregar mapa:", error);
+                    mapSettingsStatus.textContent = "Erro ao carregar mapa: " + error.message;
+                }
+            });
+            
+            // Carregar configurações salvas ao iniciar
+            const savedApiKey = localStorage.getItem('mapApiKey');
+            const savedServiceUrl = localStorage.getItem('mapServiceUrl');
+            const savedSourceType = localStorage.getItem('mapSourceType');
+            const savedSourceConfig = localStorage.getItem('mapSourceConfig');
+
+            if (savedApiKey && savedServiceUrl) {
+                mapApiKeyInput.value = savedApiKey;
+                mapServiceUrlInput.value = savedServiceUrl;
+                try {
+                    // Restaurar o tipo de fonte e configuração
+                    if (savedSourceType) mapSourceType = savedSourceType;
+                    if (savedSourceConfig) mapSourceConfig = JSON.parse(savedSourceConfig);
+                    
+                    loadMapLayer(savedApiKey, savedServiceUrl);
+                } catch (error) {
+                    console.error("Erro ao carregar configurações salvas:", error);
+                }
+            }
+            
+            // Criar source para features
+            const vectorSource = new ol.source.Vector();
+            
+            // Criar layer para animação de features
+            const animationLayer = new ol.layer.Vector({
+                source: new ol.source.Vector(),
+                style: styleFunction
+            });
+            
+            // Criar layer de vetores principal (para edição)
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: editStyleFunction
+            });
+            
+            // Adicionar layers ao mapa
+            map.addLayer(vectorLayer);
+            map.addLayer(animationLayer);
+            
+            // Função para converter cor com transparência
+            function getColorWithOpacity(color, opacity) {
+                if (color.startsWith('#')) {
+                    const r = parseInt(color.slice(1, 3), 16);
+                    const g = parseInt(color.slice(3, 5), 16);
+                    const b = parseInt(color.slice(5, 7), 16);
+                    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+                }
+                return color;
+            }
+            
+            // Função de estilo para animação
+            function styleFunction(feature) {
+                const type = feature.get('type');
+                
+                if (type === 'line') {
+                    return new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: feature.get('color') || '#3388ff',
+                            width: feature.get('width') || 3
+                        })
+                    });
+                } else if (type === 'polygon' || type === 'country' || type === 'geojson' || type === 'kml') {
+                    return new ol.style.Style({
+                        fill: new ol.style.Fill({
+                            color: getColorWithOpacity(
+                                feature.get('fillColor') || '#3388ff', 
+                                feature.get('opacity') || 0.5
+                            )
+                        }),
+                        stroke: new ol.style.Stroke({
+                            color: feature.get('strokeColor') || '#0066cc',
+                            width: feature.get('strokeWidth') || 2
+                        })
+                    });
+                } else if (type === 'text') {
+                    return new ol.style.Style({
+                        text: new ol.style.Text({
+                            text: feature.get('text') || 'Texto',
+                            font: (feature.get('bold') ? 'bold ' : '') + 
+                                  (feature.get('size') || '14') + 'px ' + 
+                                  (feature.get('font') || 'Arial'),
+                            fill: new ol.style.Fill({
+                                color: feature.get('color') || '#000000'
+                            }),
+                            stroke: new ol.style.Stroke({
+                                color: '#ffffff',
+                                width: 3
+                            })
+                        })
+                    });
+                }
+                
+                return null;
+            }
+            
+            // Função de estilo para edição - Modificada para controlar seleção visual
+            function editStyleFunction(feature) {
+                const type = feature.get('type');
+                
+                // Somente mostra o estilo de seleção se showSelectionStyle for true
+                if (selectedFeature === feature && showSelectionStyle) {
+                    if (type === 'line') {
+                        return new ol.style.Style({
+                            stroke: new ol.style.Stroke({
+                                color: '#ff9800',
+                                width: feature.get('width') || 3,
+                                lineDash: [5, 5]
+                            })
+                        });
+                    } else if (type === 'polygon' || type === 'country' || type === 'geojson' || type === 'kml') {
+                        return new ol.style.Style({
+                            stroke: new ol.style.Stroke({
+                                color: '#ff9800',
+                                width: feature.get('strokeWidth') || 2,
+                                lineDash: [5, 5]
+                            }),
+                            fill: new ol.style.Fill({
+                                color: getColorWithOpacity('#ff9800', 0.2)
+                            })
+                        });
+                    } else if (type === 'text') {
+                        return new ol.style.Style({
+                            text: new ol.style.Text({
+                                text: feature.get('text') || 'Texto',
+                                font: (feature.get('bold') ? 'bold ' : '') + 
+                                      (feature.get('size') || '14') + 'px ' + 
+                                      (feature.get('font') || 'Arial'),
+                                fill: new ol.style.Fill({
+                                    color: feature.get('color') || '#000000'
+                                }),
+                                stroke: new ol.style.Stroke({
+                                    color: '#ffffff',
+                                    width: 3
+                                })
+                            }),
+                            // Adicionar um ponto visível para facilitar a seleção
+                            image: new ol.style.Circle({
+                                radius: 5,
+                                fill: new ol.style.Fill({
+                                    color: '#ff9800'
+                                }),
+                                stroke: new ol.style.Stroke({
+                                    color: '#ffffff',
+                                    width: 1
+                                })
+                            })
+                        });
+                    }
+                }
+                
+                return null; // Durante a animação, não mostrar no layer de edição
+            }
+            
+            // Funções de easing para suavização de keyframes
+            const easingFunctions = {
+                // Linear (sem suavização)
+                linear: function(t) {
+                    return t;
+                },
+                // Ease in (começa lento, termina rápido)
+                easeIn: function(t) {
+                    return t * t * t;
+                },
+                // Ease out (começa rápido, termina lento)
+                easeOut: function(t) {
+                    return 1 - Math.pow(1 - t, 3);
+                },
+                // Ease in out (começa e termina lento, rápido no meio)
+                easeInOut: function(t) {
+                    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                },
+                // Bounce (efeito de quicar)
+                bounce: function(t) {
+                    const n1 = 7.5625;
+                    const d1 = 2.75;
+                    
+                    if (t < 1 / d1) {
+                        return n1 * t * t;
+                    } else if (t < 2 / d1) {
+                        return n1 * (t -= 1.5 / d1) * t + 0.75;
+                    } else if (t < 2.5 / d1) {
+                        return n1 * (t -= 2.25 / d1) * t + 0.9375;
+                    } else {
+                        return n1 * (t -= 2.625 / d1) * t + 0.984375;
+                    }
+                },
+                // Elastic (efeito elástico)
+                elastic: function(t) {
+                    return t === 0 ? 0 
+                         : t === 1 ? 1 
+                         : -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * (2 * Math.PI) / 3);
+                }
+            };
+            
+            // Função para calcular a porção visível de uma linha baseada no progresso
+            function calculateVisiblePortion(line, progress) {
+                const geometry = line.getGeometry();
+                const coordinates = geometry.getCoordinates();
+                
+                if (coordinates.length < 2) return coordinates;
+                
+                // Se progresso for 0, retorne apenas o primeiro ponto
+                if (progress <= 0) return [coordinates[0]];
+                
+                // Se progresso for 1 ou maior, retorne todos os pontos
+                if (progress >= 1) return coordinates;
+                
+                // Calcular comprimentos cumulativos
+                let totalLength = 0;
+                const segments = [];
+                for (let i = 1; i < coordinates.length; i++) {
+                    const start = coordinates[i-1];
+                    const end = coordinates[i];
+                    
+                    // Cálculo de distância entre dois pontos
+                    const dx = end[0] - start[0];
+                    const dy = end[1] - start[1];
+                    const segmentLength = Math.sqrt(dx * dx + dy * dy);
+                    
+                    segments.push({
+                        start: start,
+                        end: end,
+                        length: segmentLength,
+                        startDistance: totalLength
+                    });
+                    
+                    totalLength += segmentLength;
+                }
+                
+                // Determinar a distância correspondente ao progresso
+                const targetDistance = progress * totalLength;
+                
+                // Encontrar segmento onde a distância alvo está
+                let activeSegment = null;
+                let visibleCoordinates = [coordinates[0]]; // Sempre inclui o primeiro ponto
+                
+                for (let i = 0; i < segments.length; i++) {
+                    const segment = segments[i];
+                    
+                    // Se a distância alvo for menor que o final deste segmento
+                    if (targetDistance <= segment.startDistance + segment.length) {
+                        activeSegment = segment;
+                        break;
+                    }
+                    
+                    // Caso contrário, este segmento está totalmente visível
+                    visibleCoordinates.push(segment.end);
+                }
+                
+                // Se temos um segmento ativo, calculamos o ponto exato
+                if (activeSegment) {
+                    const segmentProgress = (targetDistance - activeSegment.startDistance) / activeSegment.length;
+                    const interpolatedX = activeSegment.start[0] + (activeSegment.end[0] - activeSegment.start[0]) * segmentProgress;
+                    const interpolatedY = activeSegment.start[1] + (activeSegment.end[1] - activeSegment.start[1]) * segmentProgress;
+                    visibleCoordinates.push([interpolatedX, interpolatedY]);
+                }
+                
+                return visibleCoordinates;
+            }
+            
+            // Animar as features com base no tempo atual
+            function updateAnimations() {
+                // Limpar animações anteriores
+                animationLayer.getSource().clear();
+                
+                // Animar cada feature
+                features.forEach(feature => {
+                    const type = feature.get('type');
+                    const animationStart = feature.get('animationStart') || 0;
+                    const animationEnd = feature.get('animationEnd') || 5;
+                    const fadeOutEnd = feature.get('fadeOutEnd') || duration; // Tempo para desaparecer
+                    
+                    // Verificar se esta feature deve ser mostrada agora
+                    if (currentTime < animationStart) {
+                        // Antes da animação, não mostrar nada
+                        return;
+                    }
+                    
+                    // Verificar se já ultrapassou o tempo de fade out
+                    if (currentTime > fadeOutEnd) {
+                        // Após o tempo de fade out, não mostrar nada
+                        return;
+                    }
+                    
+                    // Calcular opacidade para fade out (se aplicável)
+                    let fadeOpacityMultiplier = 1;
+                    if (currentTime > animationEnd && fadeOutEnd < duration) {
+                        // Calcular progresso do fade out
+                        fadeOpacityMultiplier = 1 - (currentTime - animationEnd) / (fadeOutEnd - animationEnd);
+                        
+                        // Garantir que está entre 0 e 1
+                        fadeOpacityMultiplier = Math.max(0, Math.min(1, fadeOpacityMultiplier));
+                        
+                        // Aplicar easing para fade-out
+                        const easingType = easingTypeSelect.value;
+                        if (easingFunctions[easingType]) {
+                            fadeOpacityMultiplier = easingFunctions[easingType](fadeOpacityMultiplier);
+                        }
+                    }
+                    
+                    if (type === 'line') {
+                        if (currentTime >= animationStart && currentTime <= animationEnd) {
+                            // Durante a animação de entrada, mostrar parcialmente
+                            let progress = (currentTime - animationStart) / (animationEnd - animationStart);
+                            
+                            // Aplicar suavização (easing) ao progresso
+                            const easingType = easingTypeSelect.value;
+                            if (easingFunctions[easingType]) {
+                                progress = easingFunctions[easingType](progress);
+                            }
+                            
+                            const visibleCoordinates = calculateVisiblePortion(feature, progress);
+                            
+                            if (visibleCoordinates.length > 1) {
+                                const animatedLine = new ol.Feature({
+                                    geometry: new ol.geom.LineString(visibleCoordinates),
+                                    type: 'line'
+                                });
+                                
+                                // Copiar todas as propriedades importantes
+                                Object.keys(feature.getProperties()).forEach(key => {
+                                    if (key !== 'geometry') {
+                                        animatedLine.set(key, feature.get(key));
+                                    }
+                                });
+                                
+                                // Aplicar efeito de fade out se necessário
+                                if (fadeOpacityMultiplier < 1) {
+                                    const originalColor = animatedLine.get('color') || '#3388ff';
+                                    animatedLine.set('color', getColorWithOpacity(originalColor, fadeOpacityMultiplier));
+                                }
+                                
+                                // Adicionar à layer de animação
+                                animationLayer.getSource().addFeature(animatedLine);
+                            }
+                        } else if (currentTime > animationEnd && currentTime <= fadeOutEnd) {
+                            // Após a animação, mostrar completa com possível fade out
+                            const fullLine = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: 'line'
+                            });
+                            
+                            // Copiar todas as propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry') {
+                                    fullLine.set(key, feature.get(key));
+                                }
+                            });
+                            
+                            // Aplicar fade out
+                            if (fadeOpacityMultiplier < 1) {
+                                const originalColor = fullLine.get('color') || '#3388ff';
+                                fullLine.set('color', getColorWithOpacity(originalColor, fadeOpacityMultiplier));
+                            }
+                            
+                            animationLayer.getSource().addFeature(fullLine);
+                        }
+                    } else if (type === 'polygon' || type === 'country' || type === 'geojson' || type === 'kml') {
+                        if (currentTime >= animationStart && currentTime <= animationEnd) {
+                            // Durante a animação, calcular opacidade com base no progresso
+                            let progress = (currentTime - animationStart) / (animationEnd - animationStart);
+                            
+                            // Aplicar suavização (easing) ao progresso
+                            const easingType = easingTypeSelect.value;
+                            if (easingFunctions[easingType]) {
+                                progress = easingFunctions[easingType](progress);
+                            }
+                            
+                            const targetOpacity = feature.get('opacity') || 0.5;
+                            const currentOpacity = progress * targetOpacity * fadeOpacityMultiplier;
+                            
+                            const animatedPolygon = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: type
+                            });
+                            
+                            // Copiar propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry' && key !== 'opacity') {
+                                    animatedPolygon.set(key, feature.get(key));
+                                }
+                            });
+                            animatedPolygon.set('opacity', currentOpacity);
+                            
+                            animationLayer.getSource().addFeature(animatedPolygon);
+                        } else if (currentTime > animationEnd && currentTime <= fadeOutEnd) {
+                            // Após a animação, mostrar com opacidade total ou com fade out
+                            const fullPolygon = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: type
+                            });
+                            
+                            // Copiar todas as propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry') {
+                                    fullPolygon.set(key, feature.get(key));
+                                }
+                            });
+                            
+                            // Aplicar fade out na opacidade
+                            const originalOpacity = feature.get('opacity') || 0.5;
+                            fullPolygon.set('opacity', originalOpacity * fadeOpacityMultiplier);
+                            
+                            animationLayer.getSource().addFeature(fullPolygon);
+                        }
+                    } else if (type === 'text') {
+                        if (currentTime >= animationStart && currentTime <= animationEnd) {
+                            // Durante a animação, calcular opacidade com base no progresso
+                            let progress = (currentTime - animationStart) / (animationEnd - animationStart);
+                            
+                            // Aplicar suavização (easing) ao progresso
+                            const easingType = easingTypeSelect.value;
+                            if (easingFunctions[easingType]) {
+                                progress = easingFunctions[easingType](progress);
+                            }
+                            
+                            const animatedText = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: 'text'
+                            });
+                            
+                            // Copiar todas as propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry') {
+                                    animatedText.set(key, feature.get(key));
+                                }
+                            });
+                            
+                            // Ajustar opacidade da cor do texto
+                            const color = feature.get('color') || '#000000';
+                            const finalOpacity = progress * fadeOpacityMultiplier;
+                            animatedText.set('color', getColorWithOpacity(color, finalOpacity));
+                            
+                            animationLayer.getSource().addFeature(animatedText);
+                        } else if (currentTime > animationEnd && currentTime <= fadeOutEnd) {
+                            // Após a animação, mostrar normal ou com fade out
+                            const fullText = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: 'text'
+                            });
+                            
+                            // Copiar todas as propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry') {
+                                    fullText.set(key, feature.get(key));
+                                }
+                            });
+                            
+                            // Aplicar fade out
+                            const color = feature.get('color') || '#000000';
+                            fullText.set('color', getColorWithOpacity(color, fadeOpacityMultiplier));
+                            
+                            animationLayer.getSource().addFeature(fullText);
+                        }
+                    }
+                });
+            }
+            
+            // Iniciar desenho de linha
+            drawLineBtn.addEventListener('click', function() {
+                startDrawing('line');
+            });
+            
+            // Iniciar desenho de polígono
+            drawPolygonBtn.addEventListener('click', function() {
+                startDrawing('polygon');
+            });
+            
+            // Adicionar texto
+            addTextBtn.addEventListener('click', function() {
+                if (addingText) {
+                    cancelAddingText();
+                } else {
+                    startAddingText();
+                }
+            });
+            
+            // Finalizar desenho
+            finishDrawingBtn.addEventListener('click', function() {
+                if (drawInteraction) {
+                    drawInteraction.finishDrawing();
+                    stopDrawing();
+                }
+            });
+            
+            // Funções para desenho
+            function startDrawing(type) {
+                if (isDrawing) {
+                    stopDrawing();
+                    return;
+                }
+                
+                currentDrawType = type;
+                isDrawing = true;
+                
+                // Cancelar adição de texto se estiver ativa
+                if (addingText) {
+                    cancelAddingText();
+                }
+                
+                // Desativar botão não usado e destacar o usado
+                if (type === 'line') {
+                    drawLineBtn.classList.add('drawing-active');
+                    drawLineBtn.textContent = 'Cancelar Desenho';
+                    drawPolygonBtn.disabled = true;
+                    addTextBtn.disabled = true;
+                } else {
+                    drawPolygonBtn.classList.add('drawing-active');
+                    drawPolygonBtn.textContent = 'Cancelar Desenho';
+                    drawLineBtn.disabled = true;
+                    addTextBtn.disabled = true;
+                }
+                
+                finishDrawingBtn.disabled = false;
+                statusMessageEl.textContent = `Clique no mapa para adicionar pontos ao ${type === 'line' ? 'linha' : 'polígono'}. Duplo clique para finalizar.`;
+                
+                // Esconder painéis de propriedades durante o desenho
+                hideAllPropertyEditors();
+                
+                // Criar interação de desenho
+                drawInteraction = new ol.interaction.Draw({
+                    source: vectorSource,
+                    type: type === 'line' ? 'LineString' : 'Polygon'
+                });
+                
+                // Quando o desenho for concluído
+                drawInteraction.on('drawend', function(event) {
+                    const feature = event.feature;
+                    
+                    // Adicionar propriedades comuns
+                    feature.set('type', type);
+                    feature.set('animationStart', 0);
+                    feature.set('animationEnd', 5);
+                    feature.set('fadeOutEnd', duration); // Adicionando propriedade de fade out
+                    feature.set('name', type === 'line' ? 'Linha ' + nextFeatureId : 'Polígono ' + nextFeatureId);
+                    nextFeatureId++;
+                    
+                    // Adicionar ID único
+                    const id = type + '_' + Date.now();
+                    feature.setId(id);
+                    
+                    if (type === 'line') {
+                        // Propriedades específicas de linha
+                        feature.set('color', lineColorInput.value);
+                        feature.set('width', parseInt(lineWidthInput.value));
+                    } else {
+                        // Propriedades específicas de polígono
+                        feature.set('fillColor', polygonFillColorInput.value);
+                        feature.set('opacity', parseFloat(polygonOpacityInput.value));
+                        feature.set('strokeColor', polygonStrokeColorInput.value);
+                        feature.set('strokeWidth', parseInt(polygonStrokeWidthInput.value));
+                    }
+                    
+                    // Adicionar à lista de features
+                    features.push(feature);
+                    
+                    // Adicionar à lista de objetos
+                    addToObjectsList(feature);
+                    
+                    // Selecionar a nova feature
+                    selectFeature(feature);
+                    
+                    // Parar o desenho
+                    stopDrawing();
+                    
+                    // Atualizar animações
+                    updateAnimations();
+                    
+                    statusMessageEl.textContent = `${type === 'line' ? 'Linha' : 'Polígono'} adicionado! Ajuste as propriedades no painel abaixo.`;
+                });
+                
+                map.addInteraction(drawInteraction);
+            }
+            
+            function stopDrawing() {
+                isDrawing = false;
+                
+                // Restaurar botões
+                drawLineBtn.classList.remove('drawing-active');
+                drawLineBtn.textContent = 'Desenhar Linha';
+                drawLineBtn.disabled = false;
+                
+                drawPolygonBtn.classList.remove('drawing-active');
+                drawPolygonBtn.textContent = 'Desenhar Polígono';
+                drawPolygonBtn.disabled = false;
+                
+                addTextBtn.disabled = false;
+                
+                finishDrawingBtn.disabled = true;
+                
+                if (drawInteraction) {
+                    map.removeInteraction(drawInteraction);
+                    drawInteraction = null;
+                }
+                
+                currentDrawType = null;
+            }
+            
+            // Funções para adição de texto
+            function startAddingText() {
+                addingText = true;
+                addTextBtn.classList.add('drawing-active');
+                addTextBtn.textContent = 'Cancelar Texto';
+                drawLineBtn.disabled = true;
+                drawPolygonBtn.disabled = true;
+                
+                statusMessageEl.textContent = "Clique no mapa para posicionar o texto.";
+                
+                map.once('click', function(evt) {
+                    // Criar um ponto para o texto
+                    const point = new ol.Feature({
+                        geometry: new ol.geom.Point(evt.coordinate),
+                        type: 'text',
+                        text: textContentInput.value || 'Novo Texto',
+                        color: textColorInput.value || '#000000',
+                        size: parseInt(textSizeInput.value) || 14,
+                        font: textFontInput.value || 'Arial',
+                        bold: textBoldInput.checked,
+                        animationStart: parseFloat(textAnimationStartInput.value) || 0,
+                        animationEnd: parseFloat(textAnimationEndInput.value) || 5,
+                        fadeOutEnd: duration, // Adicionando propriedade de fade out
+                        name: 'Texto ' + nextFeatureId
+                    });
+                    
+                    // Adicionar ID único
+                    point.setId('text_' + Date.now());
+                    nextFeatureId++;
+                    
+                    // Adicionar à lista de features
+                    features.push(point);
+                    vectorSource.addFeature(point);
+                    
+                    // Adicionar à lista de objetos
+                    addToObjectsList(point);
+                    
+                    // Selecionar o novo texto
+                    selectFeature(point);
+                    
+                    // Atualizar animações
+                    updateAnimations();
+                    
+                    statusMessageEl.textContent = "Texto adicionado! Ajuste as propriedades no painel abaixo.";
+                    
+                    // Finalizar adição
+                    cancelAddingText();
+                });
+            }
+            
+            function cancelAddingText() {
+                addingText = false;
+                addTextBtn.classList.remove('drawing-active');
+                addTextBtn.textContent = 'Adicionar Texto';
+                drawLineBtn.disabled = false;
+                drawPolygonBtn.disabled = false;
+            }
+            
+            // Adicionar feature à lista de objetos
+            function addToObjectsList(feature) {
+                const id = feature.getId();
+                const type = feature.get('type');
+                const name = feature.get('name') || id;
+                
+                const item = document.createElement('div');
+                item.className = 'object-item';
+                item.setAttribute('data-id', id);
+                
+                let typeIcon = '📝';
+                if (type === 'line') typeIcon = '📏';
+                if (type === 'polygon') typeIcon = '🔷';
+                if (type === 'country') typeIcon = '🌍';
+                if (type === 'geojson') typeIcon = '📊';
+                if (type === 'kml') typeIcon = '🗺️';
+                
+                item.innerHTML = `
+                    <span>${typeIcon} ${name}</span>
+                    <div class="object-actions">
+                        <button class="edit-btn">Editar</button>
+                        <button class="delete-btn">Excluir</button>
+                    </div>
+                `;
+                
+                // Adicionar eventos
+                item.querySelector('.edit-btn').addEventListener('click', function() {
+                    const feature = findFeatureById(id);
+                    if (feature) {
+                        selectFeature(feature);
+                    }
+                });
+                
+                item.querySelector('.delete-btn').addEventListener('click', function() {
+                    deleteFeature(id);
+                });
+                
+                // Adicionar à lista
+                objectsList.appendChild(item);
+            }
+            
+            // Encontrar feature por ID
+            function findFeatureById(id) {
+                return features.find(f => f.getId() === id);
+            }
+            
+            // Excluir feature
+            function deleteFeature(id) {
+                const feature = findFeatureById(id);
+                if (!feature) return;
+                
+                // Remover do vetor
+                vectorSource.removeFeature(feature);
+                
+                // Remover da lista de features
+                const index = features.findIndex(f => f.getId() === id);
+                if (index !== -1) {
+                    features.splice(index, 1);
+                }
+                
+                // Remover da lista de objetos
+                const itemEl = objectsList.querySelector(`[data-id="${id}"]`);
+                if (itemEl) {
+                    itemEl.remove();
+                }
+                
+                // Se estava selecionado, limpar seleção
+                if (selectedFeature && selectedFeature.getId() === id) {
+                    selectedFeature = null;
+                    hideAllPropertyEditors();
+                }
+                
+                // Atualizar animações
+                updateAnimations();
+                
+                statusMessageEl.textContent = "Objeto excluído.";
+            }
+            
+            // Esconder todos os editores de propriedades
+            function hideAllPropertyEditors() {
+                linePropertiesEl.classList.remove('active');
+                polygonPropertiesEl.classList.remove('active');
+                textPropertiesEl.classList.remove('active');
+            }
+            
+            // Selecionar feature
+            function selectFeature(feature) {
+                selectedFeature = feature;
+                // Ativar a visualização de seleção
+                showSelectionStyle = true;
+                vectorLayer.changed();
+                
+                const type = feature.get('type');
+                
+                // Esconder todos os painéis
+                hideAllPropertyEditors();
+                
+                // Destacar na lista de objetos
+                document.querySelectorAll('.object-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                const itemEl = objectsList.querySelector(`[data-id="${feature.getId()}"]`);
+                if (itemEl) {
+                    itemEl.classList.add('selected');
+                    // Rolar para o item selecionado
+                    itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                
+                if (type === 'line') {
+                    // Atualizar editor de propriedades de linha
+                    lineColorInput.value = feature.get('color') || '#3388ff';
+                    lineWidthInput.value = feature.get('width') || 3;
+                    lineAnimationStartInput.value = feature.get('animationStart') || 0;
+                    lineAnimationEndInput.value = feature.get('animationEnd') || 5;
+                    lineFadeOutEndInput.value = feature.get('fadeOutEnd') || duration;
+                    
+                    // Mostrar editor de propriedades
+                    linePropertiesEl.classList.add('active');
+                    
+                    statusMessageEl.textContent = "Linha selecionada. Edite suas propriedades.";
+                } else if (type === 'polygon' || type === 'country' || type === 'geojson' || type === 'kml') {
+                    // Atualizar editor de propriedades de polígono
+                    polygonFillColorInput.value = feature.get('fillColor') || '#3388ff';
+                    polygonOpacityInput.value = feature.get('opacity') || 0.5;
+                    polygonStrokeColorInput.value = feature.get('strokeColor') || '#0066cc';
+                    polygonStrokeWidthInput.value = feature.get('strokeWidth') || 2;
+                    polygonAnimationStartInput.value = feature.get('animationStart') || 0;
+                    polygonAnimationEndInput.value = feature.get('animationEnd') || 5;
+                    polygonFadeOutEndInput.value = feature.get('fadeOutEnd') || duration;
+                    
+                    // Mostrar editor de propriedades
+                    polygonPropertiesEl.classList.add('active');
+                    
+                    let typeText = type === 'country' ? 'País' : 
+                                  type === 'geojson' ? 'GeoJSON' :
+                                  type === 'kml' ? 'KML/KMZ' : 'Polígono';
+                    
+                    statusMessageEl.textContent = `${typeText} selecionado. Edite suas propriedades.`;
+                } else if (type === 'text') {
+                    // Atualizar editor de propriedades de texto
+                    textContentInput.value = feature.get('text') || 'Novo Texto';
+                    textColorInput.value = feature.get('color') || '#000000';
+                    textSizeInput.value = feature.get('size') || 14;
+                    textFontInput.value = feature.get('font') || 'Arial';
+                    textBoldInput.checked = feature.get('bold') || false;
+                    textAnimationStartInput.value = feature.get('animationStart') || 0;
+                    textAnimationEndInput.value = feature.get('animationEnd') || 5;
+                    textFadeOutEndInput.value = feature.get('fadeOutEnd') || duration;
+                    
+                    // Mostrar editor de propriedades
+                    textPropertiesEl.classList.add('active');
+                    
+                    statusMessageEl.textContent = "Texto selecionado. Edite suas propriedades.";
+                }
+            }
+            
+            // Atualizar propriedades da linha
+            updateLineBtn.addEventListener('click', function() {
+                if (!selectedFeature || selectedFeature.get('type') !== 'line') {
+                    statusMessageEl.textContent = "Nenhuma linha selecionada!";
+                    return;
+                }
+                
+                // Atualizar propriedades
+                selectedFeature.set('color', lineColorInput.value);
+                selectedFeature.set('width', parseInt(lineWidthInput.value));
+                selectedFeature.set('animationStart', parseFloat(lineAnimationStartInput.value));
+                selectedFeature.set('animationEnd', parseFloat(lineAnimationEndInput.value));
+                selectedFeature.set('fadeOutEnd', parseFloat(lineFadeOutEndInput.value));
+                
+                // Esconder visualização de seleção para que não apareça a linha laranja
+                showSelectionStyle = false;
+                
+                // Forçar redesenho
+                vectorLayer.changed();
+                animationLayer.changed();
+                updateAnimations();
+                
+                statusMessageEl.textContent = "Propriedades da linha atualizadas!";
+            });
+            
+            // Atualizar propriedades do polígono
+            updatePolygonBtn.addEventListener('click', function() {
+                if (!selectedFeature || (selectedFeature.get('type') !== 'polygon' && 
+                                        selectedFeature.get('type') !== 'country' && 
+                                        selectedFeature.get('type') !== 'geojson' &&
+                                        selectedFeature.get('type') !== 'kml')) {
+                    statusMessageEl.textContent = "Nenhum polígono selecionado!";
+                    return;
+                }
+                
+                // Atualizar propriedades
+                selectedFeature.set('fillColor', polygonFillColorInput.value);
+                selectedFeature.set('opacity', parseFloat(polygonOpacityInput.value));
+                selectedFeature.set('strokeColor', polygonStrokeColorInput.value);
+                selectedFeature.set('strokeWidth', parseInt(polygonStrokeWidthInput.value));
+                selectedFeature.set('animationStart', parseFloat(polygonAnimationStartInput.value));
+                selectedFeature.set('animationEnd', parseFloat(polygonAnimationEndInput.value));
+                selectedFeature.set('fadeOutEnd', parseFloat(polygonFadeOutEndInput.value));
+                
+                // Esconder visualização de seleção para que não apareça a linha laranja
+                showSelectionStyle = false;
+                
+                // Forçar redesenho
+                vectorLayer.changed();
+                animationLayer.changed();
+                updateAnimations();
+                
+                statusMessageEl.textContent = "Propriedades do polígono atualizadas!";
+            });
+            
+            // Atualizar propriedades do texto
+            updateTextBtn.addEventListener('click', function() {
+                if (!selectedFeature || selectedFeature.get('type') !== 'text') {
+                    statusMessageEl.textContent = "Nenhum texto selecionado!";
+                    return;
+                }
+                
+                // Atualizar propriedades
+                selectedFeature.set('text', textContentInput.value);
+                selectedFeature.set('color', textColorInput.value);
+                selectedFeature.set('size', parseInt(textSizeInput.value));
+                selectedFeature.set('font', textFontInput.value);
+                selectedFeature.set('bold', textBoldInput.checked);
+                selectedFeature.set('animationStart', parseFloat(textAnimationStartInput.value));
+                selectedFeature.set('animationEnd', parseFloat(textAnimationEndInput.value));
+                selectedFeature.set('fadeOutEnd', parseFloat(textFadeOutEndInput.value));
+                
+                // Esconder visualização de seleção para que não apareça a linha laranja
+                showSelectionStyle = false;
+                
+                // Forçar redesenho
+                vectorLayer.changed();
+                animationLayer.changed();
+                updateAnimations();
+                
+                statusMessageEl.textContent = "Propriedades do texto atualizadas!";
+            });
+            
+            // Clicar em features para selecionar
+            map.on('click', function(evt) {
+                if (isDrawing || addingText) return; // Não selecionar durante o desenho ou adição de texto
+                
+                const feature = map.forEachFeatureAtPixel(evt.pixel, function(feature) {
+                    return feature;
+                });
+                
+                if (feature && feature.get('type')) {
+                    selectFeature(feature);
+                } else {
+                    // Desselecionar apenas se clicar em área vazia
+                    if (!feature) {
+                        selectedFeature = null;
+                        hideAllPropertyEditors();
+                        // Desselecionar na lista
+                        document.querySelectorAll('.object-item').forEach(item => {
+                            item.classList.remove('selected');
+                        });
+                        vectorLayer.changed();
+                        statusMessageEl.textContent = "";
+                    }
+                }
+            });
+            
+            // Adicionar keyframe
+            addKeyframeBtn.addEventListener('click', function() {
+                const view = map.getView();
+                const center = view.getCenter();
+                const zoom = view.getZoom();
+                
+                // Criar keyframe
+                const keyframe = {
+                    time: currentTime,
+                    state: {
+                        center: center,
+                        zoom: zoom
+                    }
+                };
+                
+                // Adicionar à lista e ordenar
+                keyframes.push(keyframe);
+                keyframes.sort((a, b) => a.time - b.time);
+                
+                // Atualizar visualização
+                updateKeyframeMarkers();
+                
+                statusMessageEl.textContent = `Keyframe adicionado no tempo: ${currentTime.toFixed(1)}s`;
+            });
+            
+            // Atualizar marcadores de keyframe na timeline
+            function updateKeyframeMarkers() {
+                // Limpar marcadores existentes
+                keyframesContainer.innerHTML = '';
+                
+                // Adicionar novo marcador para cada keyframe
+                keyframes.forEach(keyframe => {
+                    const marker = document.createElement('div');
+                    marker.className = 'keyframe-marker';
+                    marker.style.left = (keyframe.time / duration * 100) + '%';
+                    
+                    // Adicionar evento de clique para selecionar keyframe
+                    marker.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        setCurrentTime(keyframe.time);
+                    });
+                    
+                    keyframesContainer.appendChild(marker);
+                });
+            }
+            
+            // Controle de timeline
+            timelineEl.addEventListener('click', function(e) {
+                if (e.target.classList.contains('keyframe-marker')) return;
+                
+                const rect = timelineEl.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const newTime = (x / rect.width) * duration;
+                setCurrentTime(newTime);
+            });
+            
+            // Função para definir o tempo atual
+            function setCurrentTime(time) {
+                currentTime = Math.min(Math.max(time, 0), duration);
+                const percentage = (currentTime / duration) * 100;
+                playheadEl.style.left = `${percentage}%`;
+                
+                // Interpolar entre keyframes
+                if (keyframes.length > 0) {
+                    interpolateMap();
+                }
+                
+                // Atualizar animações
+                updateAnimations();
+            }
+            
+            // Função para interpolar o estado do mapa
+            function interpolateMap() {
+                // Encontrar keyframes antes e depois
+                let prevKeyframe = null;
+                let nextKeyframe = null;
+                
+                for (let i = 0; i < keyframes.length; i++) {
+                    if (keyframes[i].time <= currentTime) {
+                        prevKeyframe = keyframes[i];
+                    } else {
+                        nextKeyframe = keyframes[i];
+                        break;
+                    }
+                }
+                
+                if (!prevKeyframe && !nextKeyframe) return;
+                
+                if (prevKeyframe && !nextKeyframe) {
+                    // Aplicar estado do último keyframe
+                    const view = map.getView();
+                    view.setCenter(prevKeyframe.state.center);
+                    view.setZoom(prevKeyframe.state.zoom);
+                    return;
+                }
+                
+                if (!prevKeyframe && nextKeyframe) {
+                    // Aplicar estado do primeiro keyframe
+                    const view = map.getView();
+                    view.setCenter(nextKeyframe.state.center);
+                    view.setZoom(nextKeyframe.state.zoom);
+                    return;
+                }
+                
+                // Interpolar entre os dois com easing
+                const normalizedTime = (currentTime - prevKeyframe.time) / (nextKeyframe.time - prevKeyframe.time);
+                
+                // Aplicar função de easing
+                const easingType = easingTypeSelect.value;
+                let easedTime = normalizedTime;
+                if (easingFunctions[easingType]) {
+                    easedTime = easingFunctions[easingType](normalizedTime);
+                }
+                
+                const center = [
+                    prevKeyframe.state.center[0] + (nextKeyframe.state.center[0] - prevKeyframe.state.center[0]) * easedTime,
+                    prevKeyframe.state.center[1] + (nextKeyframe.state.center[1] - prevKeyframe.state.center[1]) * easedTime
+                ];
+                
+                const zoom = prevKeyframe.state.zoom + (nextKeyframe.state.zoom - prevKeyframe.state.zoom) * easedTime;
+                
+                const view = map.getView();
+                view.setCenter(center);
+                view.setZoom(zoom);
+            }
+            
+            // Iniciar animação
+            playBtn.addEventListener('click', function() {
+                if (isPlaying) return;
+                
+                if (currentTime >= duration) {
+                    setCurrentTime(0);
+                }
+                
+                isPlaying = true;
+                statusMessageEl.textContent = "Reproduzindo animação...";
+                let lastTime = performance.now();
+                
+                function animate(time) {
+                    if (!isPlaying) return;
+                    
+                    const deltaTime = (time - lastTime) / 1000;
+                    lastTime = time;
+                    
+                    currentTime += deltaTime;
+                    if (currentTime >= duration) {
+                        currentTime = duration;
+                        isPlaying = false;
+                        statusMessageEl.textContent = "Animação concluída.";
+                    }
+                    
+                    setCurrentTime(currentTime);
+                    
+                    if (isPlaying) {
+                        animationFrame = requestAnimationFrame(animate);
+                    }
+                }
+                
+                animationFrame = requestAnimationFrame(animate);
+            });
+            
+            // Parar animação
+            stopBtn.addEventListener('click', function() {
+                isPlaying = false;
+                if (animationFrame) {
+                    cancelAnimationFrame(animationFrame);
+                }
+                statusMessageEl.textContent = "Animação pausada.";
+            });
+            
+           // Função corrigida para criar um mapa de exportação com TODAS as camadas
+function createExportMap(width, height) {
+    console.log("Criando mapa de exportação...");
+    console.log("Tipo de fonte:", mapSourceType);
+    console.log("Config de fonte:", mapSourceConfig);
+    
+    // Limpar container de exportação anterior
+    exportContainer.innerHTML = '';
+    
+    // Criar elemento para o mapa de exportação
+    const mapElement = document.createElement('div');
+    mapElement.style.width = width + 'px';
+    mapElement.style.height = height + 'px';
+    exportContainer.appendChild(mapElement);
+    
+    // Array para armazenar camadas
+    const exportLayers = [];
+    
+    // 1. Criar a camada base do mapa - Usando EXATAMENTE a mesma configuração
+    let baseLayer;
+    
+    try {
+        // Verificar que tipo de mapa está sendo usado e replicá-lo
+        if (mapSourceType === 'osm') {
+            // Se for OpenStreetMap
+            baseLayer = new ol.layer.Tile({
+                source: new ol.source.OSM({
+                    crossOrigin: 'anonymous'
+                }),
+                visible: true
+            });
+        } else if (mapSourceType === 'xyz') {
+            // Se for serviço XYZ (ESRI, Google, etc)
+            let source;
+            const { apiKey, serviceUrl } = mapSourceConfig;
+            
+            // Criar a mesma source com os mesmos parâmetros
+            if (serviceUrl.includes('google')) {
+                source = new ol.source.XYZ({
+                    url: `${serviceUrl}?key=${apiKey}`,
+                    attributions: '© Google Maps',
+                    crossOrigin: 'anonymous'
+                });
+            } else if (serviceUrl.includes('mapbox')) {
+                source = new ol.source.XYZ({
+                    url: `${serviceUrl}?access_token=${apiKey}`,
+                    attributions: '© Mapbox',
+                    crossOrigin: 'anonymous'
+                });
+            } else if (serviceUrl.includes('arcgis') || serviceUrl.includes('esri')) {
+                source = new ol.source.XYZ({
+                    url: serviceUrl,
+                    attributions: '© Esri',
+                    crossOrigin: 'anonymous'
+                });
+            } else {
+                source = new ol.source.XYZ({
+                    url: serviceUrl,
+                    attributions: '© Map Service',
+                    crossOrigin: 'anonymous'
+                });
+            }
+            
+            baseLayer = new ol.layer.Tile({
+                source: source,
+                visible: true,
+                preload: 4
+            });
+        } else {
+            // Fallback para OSM caso não seja possível determinar o tipo
+            console.warn("Tipo de fonte de mapa desconhecido, usando OSM como fallback");
+            baseLayer = new ol.layer.Tile({
+                source: new ol.source.OSM({
+                    crossOrigin: 'anonymous'
+                }),
+                visible: true
+            });
+        }
+    } catch (error) {
+        console.error("Erro ao criar camada base para exportação:", error);
+        // Fallback para OSM em caso de erro
+        baseLayer = new ol.layer.Tile({
+            source: new ol.source.OSM({
+                crossOrigin: 'anonymous'
+            }),
+            visible: true
+        });
+    }
+    
+    // Adicionar a camada base ao array
+    exportLayers.push(baseLayer);
+    
+    // 2. Adicionar camada de vetor para elementos
+    const vectorExportLayer = new ol.layer.Vector({
+        source: new ol.source.Vector(),
+        style: styleFunction
+    });
+    exportLayers.push(vectorExportLayer);
+    
+    // 3. Criar o mapa de exportação
+    const exportMap = new ol.Map({
+        target: mapElement,
+        layers: exportLayers,
+        view: new ol.View({
+            center: map.getView().getCenter(),
+            zoom: map.getView().getZoom(),
+            rotation: map.getView().getRotation()
+        }),
+        controls: [] // Sem controles para exportação
+    });
+    
+    // CORREÇÃO: Copiar todas as features do mapa original para o mapa de exportação
+    try {
+        // Obter todas as features do mapa original
+        const originalFeatures = vectorLayer.getSource().getFeatures();
+        console.log(`Copiando ${originalFeatures.length} features para o mapa de exportação`);
+        
+        // Copiar cada feature para o mapa de exportação
+        originalFeatures.forEach(feature => {
+            // Clonar a feature para evitar problemas de referência
+            const clonedFeature = feature.clone();
+            vectorExportLayer.getSource().addFeature(clonedFeature);
+        });
+        
+        // Verificar se outras camadas vetoriais precisam ser copiadas também
+        if (textLayer && textLayer.getSource) {
+            const textFeatures = textLayer.getSource().getFeatures();
+            console.log(`Copiando ${textFeatures.length} features de texto para o mapa de exportação`);
+            textFeatures.forEach(feature => {
+                const clonedFeature = feature.clone();
+                vectorExportLayer.getSource().addFeature(clonedFeature);
+            });
+        }
+        
+        // Se houver camadas adicionais específicas para determinados tipos de elementos
+        // (pode ser necessário adicionar mais camadas dependendo da estrutura do seu aplicativo)
+        const additionalLayers = [
+            polygonLayer, lineLayer, pointLayer, markerLayer
+        ].filter(layer => layer && layer.getSource);
+        
+        additionalLayers.forEach((layer, index) => {
+            try {
+                const layerFeatures = layer.getSource().getFeatures();
+                console.log(`Copiando ${layerFeatures.length} features da camada adicional ${index} para o mapa de exportação`);
+                layerFeatures.forEach(feature => {
+                    const clonedFeature = feature.clone();
+                    vectorExportLayer.getSource().addFeature(clonedFeature);
+                });
+            } catch (err) {
+                console.warn(`Erro ao copiar features da camada adicional ${index}:`, err);
+            }
+        });
+        
+    } catch (error) {
+        console.error("Erro ao copiar features para o mapa de exportação:", error);
+    }
+    
+    // 4. Retornar o mapa e a camada vetorial para manipulação posterior
+    return {
+        map: exportMap,
+        vectorLayer: vectorExportLayer
+    };
+}
+            
+            // Função aprimorada para esperar o carregamento dos tiles
+            function waitForTilesToLoad(map) {
+                return new Promise((resolve) => {
+                    // Obter o valor do timeout das configurações do usuário
+                    const timeoutDuration = parseInt(tileLoadTimeoutInput.value);
+                    
+                    // Tempo máximo de espera para evitar que a função trave
+                    const timeout = setTimeout(() => {
+                        console.log('Timeout esperando pelos tiles, continuando mesmo assim');
+                        resolve();
+                    }, timeoutDuration); // Usar o valor configurado pelo usuário
+                    
+                    // Função para verificar o status de carregamento
+                    function checkTileLoadStatus() {
+                        // Aguardar um curto período para dar tempo ao mapa de processar
+                        setTimeout(() => {
+                            clearTimeout(timeout);
+                            resolve();
+                        }, 500);
+                    }
+                    
+                    // Iniciar a verificação
+                    checkTileLoadStatus();
+                });
+            }
+            
+            // Função para exportar frames como ZIP com maior tempo de espera
+            async function exportFramesAsZip(width, height, fps) {
+                // Preparar elementos e variáveis
+                isExporting = true;
+                exportBtn.disabled = true;
+                exportBtn.textContent = 'Exportando...';
+                exportProgressContainer.style.display = 'block';
+                exportProgressBar.style.width = '0%';
+                exportProgressBar.textContent = '0%';
+
+                // Salvar o tempo atual para restaurar depois
+                const tempCurrentTime = currentTime;
+                
+                // Usar a duração configurada pelo usuário para exportação
+                const exportDuration = parseInt(videoDurationInput.value);
+                
+                // Obter o atraso entre frames das configurações
+                const frameDelay = parseInt(frameDelayInput.value);
+
+                // Parâmetros da animação
+                const totalFrames = Math.ceil(exportDuration * fps);
+                const timeStep = exportDuration / totalFrames;
+
+                // Criar ZIP
+                const zip = new JSZip();
+                const framesFolder = zip.folder("frames");
+
+                // Status inicial
+                statusMessageEl.textContent = 'Gerando frames para ZIP...';
+
+                try {
+                    // Criar um mapa dedicado para exportação com a proporção correta
+                    const exportMapData = createExportMap(width, height);
+                    const exportMap = exportMapData.map;
+                    const exportVectorLayer = exportMapData.vectorLayer;
+
+                    // Aguardar um tempo maior para o mapa inicializar completamente
+                    statusMessageEl.textContent = 'Inicializando mapa para exportação...';
+                    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 segundos de espera inicial
+
+                    // Processar cada frame
+                    for (let frameCount = 0; frameCount < totalFrames; frameCount++) {
+                        // Atualizar progresso
+                        const progress = Math.round((frameCount / totalFrames) * 100);
+                        exportProgressBar.style.width = progress + '%';
+                        exportProgressBar.textContent = progress + '%';
+                        statusMessageEl.textContent = `Gerando frame ${frameCount+1} de ${totalFrames} (${progress}%)`;
+
+                        // Definir o tempo para este frame - mapear de [0, totalFrames] para [0, duration]
+                        const frameTime = (frameCount / totalFrames) * exportDuration;
+
+                        // Atualizar o mapa de exportação para corresponder ao frame atual
+                        updateExportMapForFrame(exportMap, exportVectorLayer, frameTime, exportDuration);
+
+                        // Aguardar o carregamento dos tiles com a função melhorada
+                        await waitForTilesToLoad(exportMap);
+                        
+                        // Tempo adicional de espera entre frames (configurável)
+                        await new Promise(resolve => setTimeout(resolve, frameDelay));
+
+                        // Capturar o frame com qualidade máxima
+                        const canvas = await html2canvas(exportMap.getViewport(), {
+                            width: width,
+                            height: height,
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: '#FFFFFF',
+                            imageTimeout: parseInt(tileLoadTimeoutInput.value), // Usar o mesmo timeout para imagens
+                            scale: 1, // Escala 1:1 para melhor qualidade
+                        });
+
+                        // Converter canvas para blob com qualidade máxima
+                        const blob = await new Promise(resolve => {
+                            canvas.toBlob(resolve, 'image/png', 1.0); // Qualidade 1.0 (máxima)
+                        });
+
+                        // Adicionar ao ZIP
+                        const frameName = `frame_${frameCount.toString().padStart(5, '0')}.png`;
+                        framesFolder.file(frameName, blob);
+                    }
+
+                    // Gerar ZIP
+                    statusMessageEl.textContent = 'Criando arquivo ZIP...';
+                    const zipBlob = await zip.generateAsync({
+                        type: 'blob',
+                        compression: "DEFLATE",
+                        compressionOptions: {
+                            level: 6
+                        }
+                    }, function(metadata) {
+                        exportProgressBar.style.width = metadata.percent + '%';
+                        exportProgressBar.textContent = Math.round(metadata.percent) + '%';
+                    });
+
+                    // Download do ZIP
+                    saveAs(zipBlob, 'mapa-frames.zip');
+
+                    // Finalizar
+                    exportProgressBar.style.width = '100%';
+                    exportProgressBar.textContent = 'Concluído!';
+                    statusMessageEl.textContent = 'Frames exportados como ZIP!';
+
+                    // Limpar o container de exportação
+                    exportContainer.innerHTML = '';
+
+                } catch (error) {
+                    console.error('Erro na exportação:', error);
+                    statusMessageEl.textContent = 'Erro na exportação: ' + error.message;
+                } finally {
+                    // Restaurar interface
+                    isExporting = false;
+                    exportBtn.disabled = false;
+                    exportBtn.textContent = 'Exportar Vídeo';
+
+                    // Voltar ao tempo original
+                    setCurrentTime(tempCurrentTime);
+                }
+            }
+            
+            // Atualizar o mapa de exportação para um determinado frame
+            function updateExportMapForFrame(exportMap, exportVectorLayer, frameTime, exportDuration) {
+                // Usar a duração real do vídeo exportado
+                const actualDuration = exportDuration || duration;
+                
+                // Definir o mesmo centro e zoom que o mapa principal teria neste tempo
+                const view = exportMap.getView();
+                
+                // Encontrar os keyframes antes e depois
+                let prevKeyframe = null;
+                let nextKeyframe = null;
+                
+                for (let i = 0; i < keyframes.length; i++) {
+                    // Ajustar para a duração de exportação
+                    const adjustedKeyframeTime = (keyframes[i].time / duration) * actualDuration;
+                    
+                    if (adjustedKeyframeTime <= frameTime) {
+                        prevKeyframe = {
+                            time: adjustedKeyframeTime,
+                            state: keyframes[i].state
+                        };
+                    } else {
+                        nextKeyframe = {
+                            time: adjustedKeyframeTime,
+                            state: keyframes[i].state
+                        };
+                        break;
+                    }
+                }
+                
+                // Aplicar a interpolação do mapa
+                if (prevKeyframe && !nextKeyframe) {
+                    view.setCenter(prevKeyframe.state.center);
+                    view.setZoom(prevKeyframe.state.zoom);
+                } else if (!prevKeyframe && nextKeyframe) {
+                    view.setCenter(nextKeyframe.state.center);
+                    view.setZoom(nextKeyframe.state.zoom);
+                } else if (prevKeyframe && nextKeyframe) {
+                    const normalizedTime = (frameTime - prevKeyframe.time) / (nextKeyframe.time - prevKeyframe.time);
+                    
+                    // Aplicar easing
+                    const easingType = easingTypeSelect.value;
+                    let easedTime = normalizedTime;
+                    if (easingFunctions[easingType]) {
+                        easedTime = easingFunctions[easingType](normalizedTime);
+                    }
+                    
+                    const center = [
+                        prevKeyframe.state.center[0] + (nextKeyframe.state.center[0] - prevKeyframe.state.center[0]) * easedTime,
+                        prevKeyframe.state.center[1] + (nextKeyframe.state.center[1] - prevKeyframe.state.center[1]) * easedTime
+                    ];
+                    
+                    const zoom = prevKeyframe.state.zoom + (nextKeyframe.state.zoom - prevKeyframe.state.zoom) * easedTime;
+                    
+                    view.setCenter(center);
+                    view.setZoom(zoom);
+                }
+                
+                // Limpar layer de vetores
+                exportVectorLayer.getSource().clear();
+                
+                // Adicionar features animadas considerando fade out
+                features.forEach(feature => {
+                    const type = feature.get('type');
+                    
+                    // Ajustar tempos de animação para a duração do vídeo exportado
+                    const animationStart = (feature.get('animationStart') / duration) * actualDuration;
+                    const animationEnd = (feature.get('animationEnd') / duration) * actualDuration;
+                    const fadeOutEnd = (feature.get('fadeOutEnd') / duration) * actualDuration;
+                    
+                    // Verificar se esta feature deve ser mostrada neste tempo
+                    if (frameTime < animationStart || frameTime > fadeOutEnd) {
+                        return;
+                    }
+                    
+                    // Calcular opacidade para fade out (se aplicável)
+                    let fadeOpacityMultiplier = 1;
+                    if (frameTime > animationEnd && fadeOutEnd < actualDuration) {
+                        // Calcular progresso do fade out
+                        fadeOpacityMultiplier = 1 - (frameTime - animationEnd) / (fadeOutEnd - animationEnd);
+                        
+                        // Garantir que está entre 0 e 1
+                        fadeOpacityMultiplier = Math.max(0, Math.min(1, fadeOpacityMultiplier));
+                        
+                        // Aplicar easing
+                        const easingType = easingTypeSelect.value;
+                        if (easingFunctions[easingType]) {
+                            fadeOpacityMultiplier = easingFunctions[easingType](fadeOpacityMultiplier);
+                        }
+                    }
+                    
+                    if (type === 'line') {
+                        if (frameTime >= animationStart && frameTime <= animationEnd) {
+                            // Durante a animação de entrada, mostrar parcialmente
+                            let progress = (frameTime - animationStart) / (animationEnd - animationStart);
+                            
+                            // Aplicar easing
+                            const easingType = easingTypeSelect.value;
+                            if (easingFunctions[easingType]) {
+                                progress = easingFunctions[easingType](progress);
+                            }
+                            
+                            const visibleCoordinates = calculateVisiblePortion(feature, progress);
+                            
+                            if (visibleCoordinates.length > 1) {
+                                const animatedLine = new ol.Feature({
+                                    geometry: new ol.geom.LineString(visibleCoordinates),
+                                    type: 'line'
+                                });
+                                
+                                // Copiar propriedades
+                                Object.keys(feature.getProperties()).forEach(key => {
+                                    if (key !== 'geometry') {
+                                        animatedLine.set(key, feature.get(key));
+                                    }
+                                });
+                                
+                                // Aplicar fade out se necessário
+                                if (fadeOpacityMultiplier < 1) {
+                                    const originalColor = animatedLine.get('color') || '#3388ff';
+                                    animatedLine.set('color', getColorWithOpacity(originalColor, fadeOpacityMultiplier));
+                                }
+                                
+                                exportVectorLayer.getSource().addFeature(animatedLine);
+                            }
+                        } else if (frameTime > animationEnd && frameTime <= fadeOutEnd) {
+                            // Após a animação, mostrar completa com fade out
+                            const fullLine = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: 'line'
+                            });
+                            
+                            // Copiar propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry') {
+                                    fullLine.set(key, feature.get(key));
+                                }
+                            });
+                            
+                            // Aplicar fade out
+                            if (fadeOpacityMultiplier < 1) {
+                                const originalColor = fullLine.get('color') || '#3388ff';
+                                fullLine.set('color', getColorWithOpacity(originalColor, fadeOpacityMultiplier));
+                            }
+                            
+                            exportVectorLayer.getSource().addFeature(fullLine);
+                        }
+                    } else if (type === 'polygon' || type === 'country' || type === 'geojson' || type === 'kml') {
+                        if (frameTime >= animationStart && frameTime <= animationEnd) {
+                            // Durante a animação, animar opacidade
+                            let progress = (frameTime - animationStart) / (animationEnd - animationStart);
+                            
+                            // Aplicar easing
+                            const easingType = easingTypeSelect.value;
+                            if (easingFunctions[easingType]) {
+                                progress = easingFunctions[easingType](progress);
+                            }
+                            
+                            const targetOpacity = feature.get('opacity') || 0.5;
+                            const currentOpacity = progress * targetOpacity * fadeOpacityMultiplier;
+                            
+                            const animatedPolygon = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: type
+                            });
+                            
+                            // Copiar propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry' && key !== 'opacity') {
+                                    animatedPolygon.set(key, feature.get(key));
+                                }
+                            });
+                            animatedPolygon.set('opacity', currentOpacity);
+                            
+                            exportVectorLayer.getSource().addFeature(animatedPolygon);
+                        } else if (frameTime > animationEnd && frameTime <= fadeOutEnd) {
+                            // Após a animação, mostrar com opacidade total ou com fade out
+                            const fullPolygon = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: type
+                            });
+                            
+                            // Copiar propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry') {
+                                    fullPolygon.set(key, feature.get(key));
+                                }
+                            });
+                            
+                            // Aplicar fade out
+                            const originalOpacity = feature.get('opacity') || 0.5;
+                            fullPolygon.set('opacity', originalOpacity * fadeOpacityMultiplier);
+                            
+                            exportVectorLayer.getSource().addFeature(fullPolygon);
+                        }
+                    } else if (type === 'text') {
+                        if (frameTime >= animationStart && frameTime <= animationEnd) {
+                            // Durante a animação, animar opacidade do texto
+                            let progress = (frameTime - animationStart) / (animationEnd - animationStart);
+                            
+                            // Aplicar easing
+                            const easingType = easingTypeSelect.value;
+                            if (easingFunctions[easingType]) {
+                                progress = easingFunctions[easingType](progress);
+                            }
+                            
+                            const animatedText = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: 'text'
+                            });
+                            
+                            // Copiar propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry') {
+                                    animatedText.set(key, feature.get(key));
+                                }
+                            });
+                            
+                            // Ajustar opacidade com fade out
+                            const color = feature.get('color') || '#000000';
+                            const finalOpacity = progress * fadeOpacityMultiplier;
+                            animatedText.set('color', getColorWithOpacity(color, finalOpacity));
+                            
+                            exportVectorLayer.getSource().addFeature(animatedText);
+                        } else if (frameTime > animationEnd && frameTime <= fadeOutEnd) {
+                            // Após a animação, mostrar normal ou com fade out
+                            const fullText = new ol.Feature({
+                                geometry: feature.getGeometry().clone(),
+                                type: 'text'
+                            });
+                            
+                            // Copiar propriedades
+                            Object.keys(feature.getProperties()).forEach(key => {
+                                if (key !== 'geometry') {
+                                    fullText.set(key, feature.get(key));
+                                }
+                            });
+                            
+                            // Aplicar fade out
+                            const color = feature.get('color') || '#000000';
+                            fullText.set('color', getColorWithOpacity(color, fadeOpacityMultiplier));
+                            
+                            exportVectorLayer.getSource().addFeature(fullText);
+                        }
+                    }
+                });
+            }
+            
+            // Função para exportar vídeo com html2canvas - com espera aumentada
+            async function exportVideoWithHtml2Canvas(width, height, fps, format) {
+                // Preparar elementos e variáveis
+                isExporting = true;
+                exportBtn.disabled = true;
+                exportBtn.textContent = 'Exportando...';
+                exportProgressContainer.style.display = 'block';
+                exportProgressBar.style.width = '0%';
+                exportProgressBar.textContent = '0%';
+                
+                // Salvar o tempo atual para restaurar depois
+                const tempCurrentTime = currentTime;
+                
+                // Usar a duração configurada pelo usuário para exportação
+                const exportDuration = parseInt(videoDurationInput.value);
+                
+                // Obter o atraso entre frames das configurações
+                const frameDelay = parseInt(frameDelayInput.value);
+                
+                try {
+                    // Status inicial
+                    statusMessageEl.textContent = 'Preparando para gravação...';
+                    
+                    // Criar um mapa dedicado para exportação com a proporção correta
+                    const exportMapData = createExportMap(width, height);
+                    const exportMap = exportMapData.map;
+                    const exportVectorLayer = exportMapData.vectorLayer;
+                    
+                    // Aguardar mais tempo para o mapa renderizar completamente
+                    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 segundos
+                    
+                    // Reiniciar a animação para o início
+                    setCurrentTime(0);
+                    
+                    // Calcular o número total de frames
+                    const totalFrames = Math.ceil(exportDuration * fps);
+                    const timeStep = exportDuration / totalFrames;
+                    
+                    // Array para armazenar todos os frames
+                    const frames = [];
+                    
+                    // Gerar todos os frames primeiro
+                    for (let frameCount = 0; frameCount < totalFrames; frameCount++) {
+                        // Calculamos o tempo para cada frame, mapeando de [0, totalFrames] para [0, exportDuration]
+                        const frameTime = (frameCount / totalFrames) * exportDuration;
+                        
+                        // Atualizar o mapa de exportação
+                        updateExportMapForFrame(exportMap, exportVectorLayer, frameTime, exportDuration);
+                        
+                        const progress = Math.round((frameCount / totalFrames) * 50); // Primeiros 50%
+                        exportProgressBar.style.width = progress + '%';
+                        exportProgressBar.textContent = `Gerando frame ${frameCount+1}/${totalFrames} (${progress}%)`;
+                        statusMessageEl.textContent = `Gerando frame ${frameCount+1} de ${totalFrames} (${progress}%)`;
+                        
+                        // Aguardar o carregamento dos tiles
+                        await waitForTilesToLoad(exportMap);
+                        
+                        // Tempo adicional de espera entre frames (configurável)
+                        await new Promise(resolve => setTimeout(resolve, frameDelay));
+                        
+                        // Capturar o frame com html2canvas e alta qualidade
+                        const canvas = await html2canvas(exportMap.getViewport(), {
+                            width: width,
+                            height: height,
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: '#FFFFFF',
+                            imageTimeout: parseInt(tileLoadTimeoutInput.value), // Usar o mesmo timeout para imagens
+                            scale: 1 // Escala 1:1 para melhor qualidade
+                        });
+                        
+                        // Adicionar o frame ao array
+                        frames.push(canvas);
+                    }
+                    
+                    // Agora criar um vídeo a partir dos frames
+                    statusMessageEl.textContent = 'Convertendo frames para vídeo...';
+                    
+                    // Criar um canvas do tamanho do vídeo para o output final
+                    const outputCanvas = document.createElement('canvas');
+                    outputCanvas.width = width;
+                    outputCanvas.height = height;
+                    const outputCtx = outputCanvas.getContext('2d');
+                    
+                    // Criar um MediaRecorder para gravar o vídeo com alta qualidade
+                    const stream = outputCanvas.captureStream(fps);
+                    const mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: format === 'webm' ? 'video/webm;codecs=vp9' : 'video/webm',
+                        videoBitsPerSecond: 8000000 // 8 Mbps para maior qualidade
+                    });
+                    
+                    const chunks = [];
+                    mediaRecorder.ondataavailable = function(e) {
+                        chunks.push(e.data);
+                    };
+                    
+                    mediaRecorder.onstop = function() {
+                        try {
+                            // Criar o blob do vídeo
+                            const videoBlob = new Blob(chunks, { 
+                                type: format === 'webm' ? 'video/webm' : 'image/gif' 
+                            });
+                            
+                            if (videoBlob.size === 0) {
+                                throw new Error("Tamanho do vídeo gerado é zero bytes.");
+                            }
+                            
+                            // Criar URL e link para download
+                            const url = URL.createObjectURL(videoBlob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `mapa-animacao.${format}`;
+                            document.body.appendChild(a);
+                            a.click();
+                            
+                            // Limpar
+                            setTimeout(() => {
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            }, 100);
+                            
+                            // Finalizar
+                            exportProgressBar.style.width = '100%';
+                            exportProgressBar.textContent = 'Concluído!';
+                            statusMessageEl.textContent = 'Vídeo exportado com sucesso!';
+                        } catch (error) {
+                            console.error("Erro ao criar o vídeo:", error);
+                            statusMessageEl.textContent = "Erro ao criar o vídeo: " + error.message;
+                        }
+                        
+                        // Limpar o container de exportação em qualquer caso
+                        exportContainer.innerHTML = '';
+                        
+                        // Restaurar interface
+                        isExporting = false;
+                        exportBtn.disabled = false;
+                        exportBtn.textContent = 'Exportar Vídeo';
+                        
+                        // Voltar ao tempo original
+                        setCurrentTime(tempCurrentTime);
+                    };
+                    
+                    // Iniciar a gravação
+                    mediaRecorder.start();
+                    
+                    // Calcular o tempo total que o vídeo deve ter
+                    const videoTime = exportDuration; // duração em segundos
+                    const delayPerFrame = (videoTime * 1000) / frames.length; // tempo em ms entre frames
+                    
+                    // Renderizar cada frame no canvas de saída e atualizar o progresso
+                    for (let i = 0; i < frames.length; i++) {
+                        const progress = 50 + Math.round((i / frames.length) * 50); // Últimos 50%
+                        exportProgressBar.style.width = progress + '%';
+                        exportProgressBar.textContent = `Codificando vídeo ${i+1}/${frames.length} (${progress}%)`;
+                        statusMessageEl.textContent = `Codificando vídeo ${i+1} de ${frames.length} (${progress}%)`;
+                        
+                        // Desenhar o frame atual com alta qualidade
+                        outputCtx.clearRect(0, 0, width, height);
+                        outputCtx.drawImage(frames[i], 0, 0, width, height);
+                        
+                        // Esperar o tempo correto para o próximo frame para manter a duração correta
+                        // Use no mínimo 16ms (aproximadamente 60 FPS) para evitar problemas
+                        await new Promise(resolve => setTimeout(resolve, Math.max(16, delayPerFrame)));
+                    }
+                    
+                    // Parar a gravação
+                    mediaRecorder.stop();
+                    
+                } catch (error) {
+                    console.error('Erro na exportação:', error);
+                    statusMessageEl.textContent = 'Erro na exportação: ' + error.message;
+                    
+                    // Limpar o container de exportação
+                    exportContainer.innerHTML = '';
+                    
+                    // Restaurar interface em caso de erro
+                    isExporting = false;
+                    exportBtn.disabled = false;
+                    exportBtn.textContent = 'Exportar Vídeo';
+                    
+                    // Voltar ao tempo original
+                    setCurrentTime(tempCurrentTime);
+                }
+            }
+            
+            // Função para exportar - ponto de entrada principal
+            exportBtn.addEventListener('click', function() {
+                if (isExporting) return;
+                
+                const quality = videoQualitySelect.value;
+                const fps = parseInt(videoFpsSelect.value);
+                const format = videoFormatSelect.value;
+                
+                // Configurações de dimensão baseadas na qualidade
+                let width, height;
+                switch(quality) {
+                    case 'low':
+                        width = 1280;
+                        height = 720;
+                        break;
+                    case 'medium':
+                        width = 1920;
+                        height = 1080;
+                        break;
+                    case 'high':
+                        width = 2560;
+                        height = 1440;
+                        break;
+                    default:
+                        width = 1920;
+                        height = 1080;
+                }
+                
+                // Verificar o formato escolhido
+                if (format === 'frames') {
+                    exportFramesAsZip(width, height, fps);
+                } else {
+                    exportVideoWithHtml2Canvas(width, height, fps, format);
+                }
+            });
+            
+            // Função para importar KML/KMZ - CORRIGIDO
+            importKmlBtn.addEventListener('click', function() {
+                const file = kmlFileInput.files[0];
+                if (!file) {
+                    statusMessageEl.textContent = "Por favor, selecione um arquivo KML ou KMZ para importar.";
+                    return;
+                }
+                
+                // Mostrar uma prévia do nome do arquivo
+                kmlPreview.style.display = 'block';
+                kmlPreview.innerHTML = `<p>Arquivo selecionado: <strong>${file.name}</strong></p>
+                                        <p>Tamanho: ${(file.size / 1024).toFixed(2)} KB</p>
+                                        <p>Processando...</p>`;
+                
+                console.log("Iniciando importação de:", file.name);
+                
+                if (file.name.toLowerCase().endsWith('.kmz')) {
+                    console.log("Detectado arquivo KMZ, processando como ZIP...");
+                    // Processar arquivo KMZ (ZIP contendo KML)
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const data = e.target.result;
+                        processKMZ(data, file.name);
+                    };
+                    reader.onerror = function(e) {
+                        console.error("Erro ao ler arquivo KMZ:", e);
+                        statusMessageEl.textContent = "Erro ao ler o arquivo KMZ.";
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    console.log("Detectado arquivo KML, processando diretamente...");
+                    // Processar arquivo KML direto
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const kml = e.target.result;
+                        processKML(kml, file.name);
+                    };
+                    reader.onerror = function(e) {
+                        console.error("Erro ao ler arquivo KML:", e);
+                        statusMessageEl.textContent = "Erro ao ler o arquivo KML.";
+                    };
+                    reader.readAsText(file);
+                }
+            });
+            
+            // Processar arquivo KMZ (KML comprimido em ZIP) - CORRIGIDO
+            async function processKMZ(data, fileName) {
+                try {
+                    console.log("Processando arquivo KMZ");
+                    
+                    if (typeof JSZip === 'undefined') {
+                        throw new Error("Biblioteca JSZip não está disponível. Verifique se o script foi carregado corretamente.");
+                    }
+                    
+                    // Carregar o arquivo KMZ (ZIP) usando JSZip
+                    const zip = await JSZip.loadAsync(data);
+                    let kmlFile = null;
+                    
+                    console.log("Arquivos no KMZ:", Object.keys(zip.files));
+                    
+                    // Procurar pelo arquivo KML dentro do KMZ
+                    for (const filename in zip.files) {
+                        if (filename.toLowerCase().endsWith('.kml')) {
+                            kmlFile = zip.files[filename];
+                            console.log("Arquivo KML encontrado:", filename);
+                            break;
+                        }
+                    }
+                    
+                    if (!kmlFile) {
+                        throw new Error("Não foi encontrado nenhum arquivo KML dentro do KMZ.");
+                    }
+                    
+                    // Extrair o conteúdo do KML
+                    const kmlText = await kmlFile.async("text");
+                    console.log("Conteúdo KML extraído, tamanho:", kmlText.length);
+                    
+                    // Atualizar o preview
+                    kmlPreview.innerHTML += `<p>Encontrado arquivo KML: ${kmlFile.name}</p>`;
+                    
+                    // Processar o KML
+                    processKML(kmlText, fileName);
+                    
+                } catch (error) {
+                    console.error("Erro ao processar KMZ:", error);
+                    kmlPreview.innerHTML += `<p style="color: red">Erro ao processar KMZ: ${error.message}</p>`;
+                    statusMessageEl.textContent = `Erro ao processar KMZ: ${error.message}`;
+                }
+            }
+            
+            // Processar arquivo KML - CORRIGIDO
+            function processKML(kmlText, fileName) {
+                try {
+                    console.log("Processando KML:", fileName);
+                    
+                    // Criar formato KML do OpenLayers
+                    const kmlFormat = new ol.format.KML({
+                        extractStyles: true,
+                        extractAttributes: true
+                    });
+                    
+                    // Converter KML para features do OpenLayers
+                    const kmlFeatures = kmlFormat.readFeatures(kmlText, {
+                        featureProjection: map.getView().getProjection()
+                    });
+                    
+                    console.log("Features encontradas:", kmlFeatures.length);
+                    
+                    if (kmlFeatures.length === 0) {
+                        throw new Error("Nenhuma feature encontrada no arquivo KML.");
+                    }
+                    
+                    // Obter estilos das configurações de importação
+                    const fillColor = kmlColorInput.value;
+                    const opacity = parseFloat(kmlOpacityInput.value);
+                    const strokeColor = kmlStrokeColorInput.value;
+                    const strokeWidth = parseInt(kmlStrokeWidthInput.value);
+                    
+                    // Processar features e adicioná-las ao mapa
+                    const processedFeatures = [];
+                    
+                    kmlFeatures.forEach((feature, index) => {
+                        // Configurar propriedades adicionais para a animação
+                        feature.set('type', 'kml');
+                        feature.set('name', feature.get('name') || `KML ${index + 1}`);
+                        feature.set('fillColor', fillColor);
+                        feature.set('opacity', opacity);
+                        feature.set('strokeColor', strokeColor);
+                        feature.set('strokeWidth', strokeWidth);
+                        feature.set('animationStart', 0);
+                        feature.set('animationEnd', 5);
+                        feature.set('fadeOutEnd', duration);
+                        
+                        // Gerar ID único
+                        feature.setId('kml_' + Date.now() + '_' + index);
+                        
+                        // Adicionar à nossa lista global de features - acesso direto à variável
+                        features.push(feature);
+                        vectorSource.addFeature(feature);
+                        addToObjectsList(feature);
+                        
+                        processedFeatures.push(feature);
+                    });
+                    
+                    // Ajustar a visualização para mostrar todas as features
+                    if (processedFeatures.length > 0) {
+                        const extent = vectorSource.getExtent();
+                        map.getView().fit(extent, { padding: [50, 50, 50, 50], duration: 1000 });
+                    }
+                    
+                    // Atualizar visualização
+                    updateAnimations();
+                    
+                    // Mostrar sucesso
+                    kmlPreview.innerHTML = `<p>Arquivo processado: <strong>${fileName}</strong></p>
+                                          <p>Features importadas: ${processedFeatures.length}</p>`;
+                    
+                    // Limpar o input de arquivo
+                    kmlFileInput.value = '';
+                    
+                    // Mensagem de sucesso
+                    statusMessageEl.textContent = `Importado com sucesso: ${processedFeatures.length} objetos do arquivo KML/KMZ.`;
+                    
+                    // Mudar para a aba de objetos
+                    document.querySelector('.tab-btn[data-tab="objects"]').click();
+                    
+                } catch (error) {
+                    console.error("Erro ao processar KML:", error);
+                    kmlPreview.innerHTML += `<p style="color: red">Erro ao processar KML: ${error.message}</p>`;
+                    statusMessageEl.textContent = `Erro ao processar KML: ${error.message}`;
+                }
+            }
+            
+            // Mostrar prévia do arquivo KML selecionado
+            kmlFileInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                // Verificar se o arquivo é KML ou KMZ
+                if (!file.name.endsWith('.kml') && !file.name.endsWith('.kmz')) {
+                    statusMessageEl.textContent = "Por favor, selecione um arquivo KML ou KMZ válido (.kml ou .kmz)";
+                    return;
+                }
+                
+                // Mostrar uma prévia do nome do arquivo
+                kmlPreview.style.display = 'block';
+                kmlPreview.innerHTML = `<p>Arquivo selecionado: <strong>${file.name}</strong></p>
+                                       <p>Tamanho: ${(file.size / 1024).toFixed(2)} KB</p>`;
+            });
+            
+            // Carregar países
+            function loadCountries() {
+                if (countriesGeoJSON || isCountriesLoading) return;
+                
+                isCountriesLoading = true;
+                statusMessageEl.textContent = "Carregando dados de países...";
+                
+                fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+                    .then(response => response.json())
+                    .then(data => {
+                        countriesGeoJSON = data;
+                        isCountriesLoading = false;
+                        statusMessageEl.textContent = "Dados de países carregados. Pesquise um país.";
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar países:', error);
+                        isCountriesLoading = false;
+                        statusMessageEl.textContent = "Erro ao carregar dados de países.";
+                    });
+            }
+            
+            // Pesquisar países
+            countrySearchInput.addEventListener('input', function() {
+                const query = this.value.trim().toLowerCase();
+                if (!query) {
+                    countryResults.innerHTML = '';
+                    return;
+                }
+                
+                // Carregar países se ainda não estiverem carregados
+                if (!countriesGeoJSON && !isCountriesLoading) {
+                    loadCountries();
+                    return;
+                }
+                
+                if (!countriesGeoJSON) {
+                    countryResults.innerHTML = '<div class="country-item">Carregando dados de países...</div>';
+                    return;
+                }
+                
+                // Filtrar países
+                const matches = countriesGeoJSON.features.filter(feature => 
+                    feature.properties.ADMIN.toLowerCase().includes(query)
+                ).slice(0, 10); // Limitar a 10 resultados
+                
+                if (matches.length === 0) {
+                    countryResults.innerHTML = '<div class="country-item">Nenhum país encontrado</div>';
+                return;
+            }
+            
+            // Mostrar resultados
+            countryResults.innerHTML = matches.map(country => 
+                `<div class="country-item" data-country="${country.properties.ADMIN}">${country.properties.ADMIN}</div>`
+            ).join('');
+            
+            // Adicionar evento de clique
+            document.querySelectorAll('.country-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const countryName = this.getAttribute('data-country');
+                    addCountry(countryName);
+                });
+            });
+        });
+        
+        // Adicionar país
+        function addCountry(countryName) {
+            if (!countriesGeoJSON) return;
+            
+            // Encontrar país
+            const country = countriesGeoJSON.features.find(f => f.properties.ADMIN === countryName);
+            if (!country) return;
+            
+            try {
+                // Converter para feature OpenLayers
+                const feature = new ol.format.GeoJSON().readFeature(country, {
+                    featureProjection: map.getView().getProjection()
+                });
+                
+               // Definir propriedades
+               feature.set('type', 'country');
+                feature.set('name', countryName);
+                feature.set('fillColor', '#3388ff');
+                feature.set('opacity', 0.5);
+                feature.set('strokeColor', '#0066cc');
+                feature.set('strokeWidth', 2);
+                feature.set('animationStart', 0);
+                feature.set('animationEnd', 5);
+                feature.set('fadeOutEnd', duration); // Adicionando propriedade de fade out
+                
+                // Adicionar ID único
+                feature.setId('country_' + Date.now());
+                
+                // Adicionar à lista de features
+                features.push(feature);
+                vectorSource.addFeature(feature);
+                
+                // Adicionar à lista de objetos
+                addToObjectsList(feature);
+                
+                // Ajustar visualização
+                const extent = feature.getGeometry().getExtent();
+                map.getView().fit(extent, { padding: [50, 50, 50, 50], duration: 1000 });
+                
+                // Selecionar o novo país
+                selectFeature(feature);
+                
+                // Limpar pesquisa
+                countrySearchInput.value = '';
+                countryResults.innerHTML = '';
+                
+                // Mostrar mensagem
+                statusMessageEl.textContent = `País ${countryName} adicionado!`;
+                
+                // Mudar para a aba de objetos
+                document.querySelector('.tab-btn[data-tab="objects"]').click();
+                
+            } catch (error) {
+                console.error('Erro ao adicionar país:', error);
+                statusMessageEl.textContent = "Erro ao adicionar país.";
+            }
+        }
+        
+        // Mudança do tipo de easing
+        easingTypeSelect.addEventListener('change', function() {
+            // Atualizar animação com o novo tipo de easing
+            updateAnimations();
+            statusMessageEl.textContent = `Transição alterada para: ${this.options[this.selectedIndex].text}`;
+        });
+        
+        // Evento para importação de GeoJSON
+        geojsonFileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // Verificar se o arquivo é um JSON ou GeoJSON
+            if (!file.name.endsWith('.json') && !file.name.endsWith('.geojson')) {
+                statusMessageEl.textContent = "Por favor, selecione um arquivo GeoJSON válido (.json ou .geojson)";
+                return;
+            }
+            
+            // Mostrar uma prévia do nome do arquivo
+            geojsonPreview.style.display = 'block';
+            geojsonPreview.innerHTML = `<p>Arquivo selecionado: <strong>${file.name}</strong></p>
+                                       <p>Tamanho: ${(file.size / 1024).toFixed(2)} KB</p>`;
+        });
+        
+        // Função para importar GeoJSON
+        importGeojsonBtn.addEventListener('click', function() {
+            const file = geojsonFileInput.files[0];
+            if (!file) {
+                statusMessageEl.textContent = "Por favor, selecione um arquivo GeoJSON para importar.";
+                return;
+            }
+            
+            // Ler o arquivo
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    // Analisar o JSON
+                    const geojsonData = JSON.parse(e.target.result);
+                    
+                    // Verificar se é um GeoJSON válido
+                    if (!geojsonData.type || !geojsonData.features && !geojsonData.geometry) {
+                        throw new Error("Formato GeoJSON inválido");
+                    }
+                    
+                    // Processar GeoJSON
+                    processGeoJSON(geojsonData, file.name);
+                    
+                } catch (error) {
+                    console.error('Erro ao processar GeoJSON:', error);
+                    statusMessageEl.textContent = `Erro ao processar GeoJSON: ${error.message}`;
+                }
+            };
+            
+            reader.onerror = function() {
+                statusMessageEl.textContent = "Erro ao ler o arquivo.";
+            };
+            
+            reader.readAsText(file);
+        });
+        
+        // Função para processar GeoJSON e adicionar ao mapa
+        function processGeoJSON(geojsonData, fileName) {
+            // Determinar o tipo de GeoJSON (FeatureCollection, Feature, ou Geometry)
+            let geoFeatures = [];
+            
+            if (geojsonData.type === 'FeatureCollection') {
+                geoFeatures = geojsonData.features;
+            } else if (geojsonData.type === 'Feature') {
+                geoFeatures = [geojsonData];
+            } else {
+                // Provavelmente é uma geometria direta
+                geoFeatures = [{
+                    type: 'Feature',
+                    geometry: geojsonData,
+                    properties: {}
+                }];
+            }
+            
+            if (geoFeatures.length === 0) {
+                statusMessageEl.textContent = "Nenhuma feature encontrada no GeoJSON.";
+                return;
+            }
+            
+            // Obter estilos das configurações de importação
+            const fillColor = geojsonColorInput.value;
+            const opacity = parseFloat(geojsonOpacityInput.value);
+            const strokeColor = geojsonStrokeColorInput.value;
+            const strokeWidth = parseInt(geojsonStrokeWidthInput.value);
+            
+            // Converter para objetos OpenLayers
+            const olFeatures = [];
+            const format = new ol.format.GeoJSON();
+            
+            geoFeatures.forEach((feature, index) => {
+                try {
+                    // Converter GeoJSON para feature OpenLayers
+                    const olFeature = format.readFeature(feature, {
+                        featureProjection: map.getView().getProjection()
+                    });
+                    
+                    // Definir propriedades
+                    olFeature.set('type', 'geojson');
+                    olFeature.set('name', feature.properties?.name || fileName.split('.')[0] + ' ' + (index + 1));
+                    olFeature.set('fillColor', fillColor);
+                    olFeature.set('opacity', opacity);
+                    olFeature.set('strokeColor', strokeColor);
+                    olFeature.set('strokeWidth', strokeWidth);
+                    olFeature.set('animationStart', 0);
+                    olFeature.set('animationEnd', 5);
+                    olFeature.set('fadeOutEnd', duration); // Adicionando propriedade de fade out
+                    
+                    // Adicionar ID único
+                    olFeature.setId('geojson_' + Date.now() + '_' + index);
+                    
+                    // Adicionar à lista de features
+                    olFeatures.push(olFeature);
+                } catch (error) {
+                    console.error('Erro ao converter feature:', error, feature);
+                }
+            });
+            
+            if (olFeatures.length === 0) {
+                statusMessageEl.textContent = "Não foi possível converter nenhuma feature.";
+                return;
+            }
+            
+            // Adicionar features ao mapa
+            olFeatures.forEach(olFeature => {
+                features.push(olFeature);  // Adiciona ao array global 'features'
+                vectorSource.addFeature(olFeature);
+                addToObjectsList(olFeature);
+            });
+            
+            // Ajustar a visualização para mostrar todos os objetos importados
+            const extent = vectorSource.getExtent();
+            map.getView().fit(extent, { padding: [50, 50, 50, 50], duration: 1000 });
+            
+            // Atualizar animações
+            updateAnimations();
+            
+            // Limpar o input de arquivo e esconder preview
+            geojsonFileInput.value = '';
+            geojsonPreview.style.display = 'none';
+            
+            // Mostrar mensagem de sucesso
+            statusMessageEl.textContent = `Importado com sucesso: ${olFeatures.length} objetos do GeoJSON.`;
+            
+            // Mudar para a aba de objetos
+            document.querySelector('.tab-btn[data-tab="objects"]').click();
+        }
+        
+        // Iniciar carregamento de países
+        loadCountries();
+        
+        // Mostrar mensagem inicial
+        statusMessageEl.textContent = "Comece desenhando uma linha, um polígono, adicionando texto ou um país.";
+    });
+</script>
+</body>
+</html>
